@@ -9,7 +9,7 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAliveClientMixin {
   bool _autoRefresh = true;
   bool _showWeather = true;
   bool _enableNotifications = true;
@@ -17,6 +17,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double _fontSize = 16.0;
   String _className = '高三(1)班';
   String _teacherName = '张老师';
+
+  @override
+  bool get wantKeepAlive => true; // 保持页面状态，避免重复加载设置
 
   @override
   void initState() {
@@ -50,6 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // 必须调用，用于保持页面状态
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
@@ -58,130 +62,141 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: ListView(
         padding: EdgeInsets.all(16.w),
+        physics: const BouncingScrollPhysics(), // 使用更流畅的滚动物理效果
         children: [
           // 班级信息设置
-          _buildSectionCard(
-            title: '班级信息',
-            icon: Icons.school,
-            children: [
-              _buildTextFieldTile(
-                title: '班级名称',
-                value: _className,
-                onChanged: (value) {
-                  setState(() {
-                    _className = value;
-                  });
-                  _saveSetting('class_name', value);
-                },
-              ),
-              _buildTextFieldTile(
-                title: '班主任姓名',
-                value: _teacherName,
-                onChanged: (value) {
-                  setState(() {
-                    _teacherName = value;
-                  });
-                  _saveSetting('teacher_name', value);
-                },
-              ),
-            ],
+          RepaintBoundary( // 添加重绘边界优化
+            child: _buildSectionCard(
+              title: '班级信息',
+              icon: Icons.school,
+              children: [
+                _buildTextFieldTile(
+                  title: '班级名称',
+                  value: _className,
+                  onChanged: (value) {
+                    setState(() {
+                      _className = value;
+                    });
+                    _saveSetting('class_name', value);
+                  },
+                ),
+                _buildTextFieldTile(
+                  title: '班主任姓名',
+                  value: _teacherName,
+                  onChanged: (value) {
+                    setState(() {
+                      _teacherName = value;
+                    });
+                    _saveSetting('teacher_name', value);
+                  },
+                ),
+              ],
+            ),
           ),
           
           SizedBox(height: 16.h),
           
           // 显示设置
-          _buildSectionCard(
-            title: '显示设置',
-            icon: Icons.display_settings,
-            children: [
-              _buildSwitchTile(
-                title: '深色模式',
-                subtitle: '启用深色主题',
-                value: _darkMode,
-                onChanged: (value) {
-                  setState(() {
-                    _darkMode = value;
-                  });
-                  _saveSetting('dark_mode', value);
-                },
-              ),
-              _buildSliderTile(
-                title: '字体大小',
-                subtitle: '调整应用字体大小',
-                value: _fontSize,
-                min: 12.0,
-                max: 24.0,
-                divisions: 12,
-                onChanged: (value) {
-                  setState(() {
-                    _fontSize = value;
-                  });
-                  _saveSetting('font_size', value);
-                },
-              ),
-              _buildSwitchTile(
-                title: '显示天气',
-                subtitle: '在主页显示天气信息',
-                value: _showWeather,
-                onChanged: (value) {
-                  setState(() {
-                    _showWeather = value;
-                  });
-                  _saveSetting('show_weather', value);
-                },
-              ),
-            ],
+          RepaintBoundary( // 添加重绘边界优化
+            child: _buildSectionCard(
+              title: '显示设置',
+              icon: Icons.display_settings,
+              children: [
+                _buildSwitchTile(
+                  title: '深色模式',
+                  subtitle: '启用深色主题',
+                  value: _darkMode,
+                  onChanged: (value) {
+                    setState(() {
+                      _darkMode = value;
+                    });
+                    _saveSetting('dark_mode', value);
+                  },
+                ),
+                _buildSliderTile(
+                  title: '字体大小',
+                  subtitle: '调整应用字体大小',
+                  value: _fontSize,
+                  min: 12.0,
+                  max: 24.0,
+                  divisions: 12,
+                  onChanged: (value) {
+                    setState(() {
+                      _fontSize = value;
+                    });
+                    _saveSetting('font_size', value);
+                  },
+                ),
+                _buildSwitchTile(
+                  title: '显示天气',
+                  subtitle: '在主页显示天气信息',
+                  value: _showWeather,
+                  onChanged: (value) {
+                    setState(() {
+                      _showWeather = value;
+                    });
+                    _saveSetting('show_weather', value);
+                  },
+                ),
+              ],
+            ),
           ),
           
           SizedBox(height: 16.h),
           
           // 功能设置
-          _buildSectionCard(
-            title: '功能设置',
-            icon: Icons.settings,
-            children: [
-              _buildSwitchTile(
-                title: '自动刷新',
-                subtitle: '自动更新课程表和时间',
-                value: _autoRefresh,
-                onChanged: (value) {
-                  setState(() {
-                    _autoRefresh = value;
-                  });
-                  _saveSetting('auto_refresh', value);
-                },
-              ),
-              _buildSwitchTile(
-                title: '通知提醒',
-                subtitle: '课程开始前提醒',
-                value: _enableNotifications,
-                onChanged: (value) {
-                  setState(() {
-                    _enableNotifications = value;
-                  });
-                  _saveSetting('enable_notifications', value);
-                },
-              ),
-            ],
+          RepaintBoundary( // 添加重绘边界优化
+            child: _buildSectionCard(
+              title: '功能设置',
+              icon: Icons.settings,
+              children: [
+                _buildSwitchTile(
+                  title: '自动刷新',
+                  subtitle: '自动更新课程表和时间',
+                  value: _autoRefresh,
+                  onChanged: (value) {
+                    setState(() {
+                      _autoRefresh = value;
+                    });
+                    _saveSetting('auto_refresh', value);
+                  },
+                ),
+                _buildSwitchTile(
+                  title: '通知提醒',
+                  subtitle: '课程开始前提醒',
+                  value: _enableNotifications,
+                  onChanged: (value) {
+                    setState(() {
+                      _enableNotifications = value;
+                    });
+                    _saveSetting('enable_notifications', value);
+                  },
+                ),
+              ],
+            ),
           ),
           
           SizedBox(height: 16.h),
           
           // 系统信息
-          _buildSectionCard(
-            title: '系统信息',
-            icon: Icons.info,
-            children: [
-              _buildInfoTile('应用版本', '1.0.0'),
-              _buildInfoTile('系统版本', 'Android 12'),
-              _buildInfoTile('设备型号', 'Class Board Pro'),
-            ],
+          RepaintBoundary( // 添加重绘边界优化
+            child: _buildSectionCard(
+              title: '系统信息',
+              icon: Icons.info,
+              children: [
+                _buildInfoTile('应用版本', '1.0.0'),
+                _buildInfoTile('系统版本', 'Android 12'),
+                _buildInfoTile('设备型号', 'Class Board Pro'),
+              ],
+            ),
           ),
           
           SizedBox(height: 16.h),
           
           // 操作按钮
-          _buildActionButtons(),
+          RepaintBoundary( // 添加重绘边界优化
+            child: _buildActionButtons(),
+          ),
           
           SizedBox(height: 32.h),
         ],
@@ -232,19 +247,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        title,
-        style: TextStyle(fontSize: 16.sp),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(fontSize: 14.sp),
-      ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
+    return RepaintBoundary( // 添加重绘边界优化
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(
+          title,
+          style: TextStyle(fontSize: 16.sp),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(fontSize: 14.sp),
+        ),
+        trailing: Switch(
+          value: value,
+          onChanged: onChanged,
+        ),
       ),
     );
   }
@@ -258,35 +275,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required int divisions,
     required ValueChanged<double> onChanged,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            title,
-            style: TextStyle(fontSize: 16.sp),
-          ),
-          subtitle: Text(
-            subtitle,
-            style: TextStyle(fontSize: 14.sp),
-          ),
-          trailing: Text(
-            '${value.toInt()}',
-            style: TextStyle(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w500,
+    return RepaintBoundary( // 添加重绘边界优化
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              title,
+              style: TextStyle(fontSize: 16.sp),
+            ),
+            subtitle: Text(
+              subtitle,
+              style: TextStyle(fontSize: 14.sp),
+            ),
+            trailing: Text(
+              '${value.toInt()}',
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-        ),
-        Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: divisions,
-          onChanged: onChanged,
-        ),
-      ],
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 
@@ -295,35 +314,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String value,
     required ValueChanged<String> onChanged,
   }) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.h),
-      child: TextFormField(
-        initialValue: value,
-        decoration: InputDecoration(
-          labelText: title,
-          border: const OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 16.w,
-            vertical: 12.h,
+    return RepaintBoundary( // 添加重绘边界优化
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 8.h),
+        child: TextFormField(
+          initialValue: value,
+          decoration: InputDecoration(
+            labelText: title,
+            border: const OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16.w,
+              vertical: 12.h,
+            ),
           ),
+          onChanged: onChanged,
         ),
-        onChanged: onChanged,
       ),
     );
   }
 
   Widget _buildInfoTile(String title, String value) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        title,
-        style: TextStyle(fontSize: 16.sp),
-      ),
-      trailing: Text(
-        value,
-        style: TextStyle(
-          fontSize: 16.sp,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return RepaintBoundary( // 添加重绘边界优化
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(
+          title,
+          style: TextStyle(fontSize: 16.sp),
+        ),
+        trailing: Text(
+          value,
+          style: TextStyle(
+            fontSize: 16.sp,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ),
     );

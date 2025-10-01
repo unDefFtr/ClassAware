@@ -10,9 +10,12 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   late Timer _timer;
   DateTime _currentTime = DateTime.now();
+
+  @override
+  bool get wantKeepAlive => true; // 保持页面状态，避免重复初始化定时器
 
   // 示例课程表数据
   final List<Map<String, dynamic>> _todaySchedule = [
@@ -72,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // 必须调用，用于保持页面状态
     return Scaffold(
       body: SafeArea(
         child: Padding(
