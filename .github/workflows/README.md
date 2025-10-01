@@ -57,7 +57,8 @@
 
 - **运行环境**: Ubuntu Latest
 - **Java 版本**: 17 (Zulu)
-- **Flutter 版本**: 3.24.0 (Stable)
+- **Flutter 版本**: 3.35.4 (Stable)
+- **Dart SDK**: 3.9.2
 - **构建类型**: Release
 
 ### 注意事项
