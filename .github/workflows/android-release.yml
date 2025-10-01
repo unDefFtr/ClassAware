@@ -1,0 +1,136 @@
+name: Android Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build-android:
+    name: Build Android Release
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        target-platform:
+          - android-arm
+          - android-arm64
+          - android-x64
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+          
+      - name: Get dependencies
+        run: flutter pub get
+        
+      - name: Run tests
+        run: flutter test
+        
+      - name: Build Android APK
+        run: |
+          flutter build apk --release --target-platform ${{ matrix.target-platform }} --split-per-abi
+          
+      - name: Build Android App Bundle
+        run: |
+          flutter build appbundle --release --target-platform ${{ matrix.target-platform }}
+          
+      - name: Get build info
+        id: build_info
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "build_number=${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+          echo "platform=${{ matrix.target-platform }}" >> $GITHUB_OUTPUT
+          
+      - name: Rename artifacts
+        run: |
+          cd build/app/outputs/flutter-apk
+          for file in *.apk; do
+            if [[ "$file" != *"${{ matrix.target-platform }}"* ]]; then
+              mv "$file" "classaware-${{ steps.build_info.outputs.platform }}-${file}"
+            fi
+          done
+          
+          cd ../bundle/release
+          mv app-release.aab "classaware-${{ steps.build_info.outputs.platform }}-release.aab"
+          
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ matrix.target-platform }}
+          path: build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
+          
+      - name: Upload AAB artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-${{ matrix.target-platform }}
+          path: build/app/outputs/bundle/release/*.aab
+          retention-days: 30
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-android
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -name "*.apk" -exec cp {} release-assets/ \;
+          find artifacts -name "*.aab" -exec cp {} release-assets/ \;
+          ls -la release-assets/
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-assets/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## 电子班牌 ${{ github.ref_name }}
+            
+            ### 构建信息
+            - 构建时间: ${{ github.run_id }}
+            - 支持平台: Android (ARM, ARM64, x64)
+            
+            ### 下载说明
+            - **APK文件**: 直接安装包，适用于侧载安装
+            - **AAB文件**: Android App Bundle，适用于Google Play发布
+            
+            ### 平台支持
+            - `android-arm`: 32位ARM设备
+            - `android-arm64`: 64位ARM设备 (推荐)
+            - `android-x64`: x86_64设备
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
