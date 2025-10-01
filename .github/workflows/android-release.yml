@@ -2,12 +2,15 @@ name: Android Release Build
 
 on:
   push:
+    branches:
+      - main
+      - master
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version'
+        description: 'Version number for the release'
         required: true
         default: '1.0.0'
 
@@ -109,25 +112,33 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: release-assets/*
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+          files: |
+            build/app/outputs/flutter-apk/classaware-android-arm-release.apk
+            build/app/outputs/flutter-apk/classaware-android-arm64-release.apk
+            build/app/outputs/flutter-apk/classaware-android-x64-release.apk
+            build/app/outputs/bundle/release/classaware-android-arm-release.aab
+            build/app/outputs/bundle/release/classaware-android-arm64-release.aab
+            build/app/outputs/bundle/release/classaware-android-x64-release.aab
+          tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
-            ## 电子班牌 ${{ github.ref_name }}
+            ## 电子班牌应用 ${{ github.ref_name }}
             
             ### 构建信息
-            - 构建时间: ${{ github.run_id }}
-            - 支持平台: Android (ARM, ARM64, x64)
+            - **构建时间**: ${{ steps.date.outputs.date }}
+            - **提交**: ${{ github.sha }}
+            - **Flutter版本**: 3.35.4
+            - **Dart SDK**: 3.9.2
             
             ### 下载说明
             - **APK文件**: 直接安装包，适用于侧载安装
-            - **AAB文件**: Android App Bundle，适用于Google Play发布
+            - **AAB文件**: Android App Bundle，适用于应用商店发布
             
-            ### 平台支持
-            - `android-arm`: 32位ARM设备
-            - `android-arm64`: 64位ARM设备 (推荐)
-            - `android-x64`: x86_64设备
+            ### 支持平台
+            - `android-arm`: 32位ARM架构（较老设备）
+            - `android-arm64`: 64位ARM架构（推荐）
+            - `android-x64`: x86_64架构（模拟器和x86设备）
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
