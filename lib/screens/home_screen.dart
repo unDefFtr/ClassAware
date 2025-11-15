@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import '../services/schedule_service.dart';
 import '../models/schedule_models.dart';
-import '../widgets/weather_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -112,32 +111,138 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 上半部分：时间显示
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // 上半部分：时间和天气并排
+            Row(
               children: [
-                Text(
-                  DateFormat('HH:mm').format(_currentTime),
-                  style: TextStyle(
-                    fontSize: 48.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+                // 左侧：时间显示
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        DateFormat('HH:mm').format(_currentTime),
+                        style: TextStyle(
+                          fontSize: 48.sp,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      Text(
+                        DateFormat('yyyy年MM月dd日').format(_currentTime),
+                        style: TextStyle(
+                          fontSize: 18.sp,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(height: 8.h),
-                Text(
-                  DateFormat('yyyy年MM月dd日').format(_currentTime),
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                SizedBox(width: 20.w),
+                // 右侧：天气信息
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Icon(
+                            Icons.wb_sunny,
+                            size: 32.w,
+                            color: Colors.orange,
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(
+                            '25°C',
+                            style: TextStyle(
+                              fontSize: 32.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8.h),
+                      Text(
+                        '晴天',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        '空气质量良好',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 16.h),
-            // 下半部分：天气组件
+            SizedBox(height: 24.h),
+            // 下半部分：7天天气预报
+            Text(
+              '未来7天',
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            SizedBox(height: 12.h),
             Expanded(
-              child: const WeatherWidget(),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _weekWeather.length,
+                itemBuilder: (context, index) {
+                  final weather = _weekWeather[index];
+                  return Container(
+                    width: 60.w,
+                    margin: EdgeInsets.only(right: 12.w),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Text(
+                          weather['day'],
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Icon(
+                          weather['icon'],
+                          size: 20.w,
+                          color: weather['icon'] == Icons.wb_sunny 
+                              ? Colors.orange 
+                              : weather['icon'] == Icons.grain 
+                                  ? Colors.blue 
+                                  : Colors.grey,
+                        ),
+                        Text(
+                          '${weather['high']}°',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${weather['low']}°',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
