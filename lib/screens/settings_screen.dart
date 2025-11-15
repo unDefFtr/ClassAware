@@ -55,14 +55,9 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   Widget build(BuildContext context) {
     super.build(context); // 必须调用，用于保持页面状态
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
-        backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-        elevation: 0,
-      ),
       body: ListView(
         padding: EdgeInsets.all(16.w),
-        physics: const BouncingScrollPhysics(), // 使用更流畅的滚动物理效果
+        physics: const BouncingScrollPhysics(),
         children: [
           // 班级信息设置
           RepaintBoundary( // 添加重绘边界优化

@@ -133,11 +133,6 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
     final screenWidth = MediaQuery.of(context).size.width;
     
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('所有应用'),
-        backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-        elevation: 0,
-      ),
       body: Column(
         children: [
           // 搜索栏
@@ -255,10 +250,10 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                       children: [
                         Container(
                           width: 48.w,
-                          height: 48.h,
+                          height: 48.w,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12.r),
-                            color: Theme.of(context).colorScheme.surfaceVariant,
+                            color: Colors.transparent,
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12.r),
@@ -266,10 +261,10 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                                 ? Image.memory(
                                     base64Decode(app['icon']),
                                     width: 48.w,
-                                    height: 48.h,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: (48.w * MediaQuery.of(context).devicePixelRatio).round(), // 缓存优化
-                                    cacheHeight: (48.h * MediaQuery.of(context).devicePixelRatio).round(),
+                                    height: 48.w,
+                                    fit: BoxFit.contain,
+                                    cacheWidth: (48.w * MediaQuery.of(context).devicePixelRatio).round(),
+                                    cacheHeight: (48.w * MediaQuery.of(context).devicePixelRatio).round(),
                                     errorBuilder: (context, error, stackTrace) {
                                       return Icon(
                                         Icons.apps,
@@ -312,8 +307,6 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
   }
 
   Widget _buildAppsList() {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final screenWidth = MediaQuery.of(context).size.width;
     
     if (_isLoading) {
       return const Center(
@@ -343,11 +336,7 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
       );
     }
 
-    // 根据屏幕方向和尺寸调整网格参数，符合MD3密度标准
-    final crossAxisCount = isLandscape ? 10 : 6; // 优化行数，平衡密度和可用性
-    final scrollWidth = isLandscape 
-        ? screenWidth * 1.6 // 适度的横向滚动空间
-        : screenWidth * 1.3;
+    // 自适应参数由下方 LayoutBuilder 计算
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h), // 添加垂直边距
@@ -365,68 +354,69 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
               ),
             ),
           ),
-          // 使用Flexible包装，允许内容在可用空间内自适应
           Flexible(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: scrollWidth,
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(), // 禁用GridView的滚动
-                  shrinkWrap: true, // 让GridView自适应内容高度
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final minTile = 96.0;
+                final spacing = (w * 0.01).clamp(4.0, 16.0);
+                final cols = (w / (minTile + spacing)).floor().clamp(4, 18);
+                return GridView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  shrinkWrap: true,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    childAspectRatio: 1.1, // 调整宽高比，减少卡片高度
-                    crossAxisSpacing: 2.w, // 减少水平间距
-                    mainAxisSpacing: 4.h, // 减少垂直间距
+                    crossAxisCount: cols,
+                    childAspectRatio: 0.95,
+                    crossAxisSpacing: spacing,
+                    mainAxisSpacing: spacing,
                   ),
                   itemCount: _filteredApps.length,
                   itemBuilder: (context, index) {
                     final app = _filteredApps[index];
-                    return RepaintBoundary( // 添加重绘边界，减少不必要的重绘
+                    return RepaintBoundary(
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () => _launchApp(app),
                           borderRadius: BorderRadius.circular(20.r),
                           child: Padding(
-                            padding: EdgeInsets.all(2.w), // 减少内边距
+                            padding: EdgeInsets.all(2.w),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Container(
                                   width: 48.w,
-                                  height: 48.h,
+                                  height: 48.w,
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                    color: Colors.transparent,
                                     borderRadius: BorderRadius.circular(12.r),
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(12.r),
                                     child: app['icon'] != null && app['icon'].toString().isNotEmpty
-                                         ? Image.memory(
-                                             base64Decode(app['icon']),
-                                             width: 48.w,
-                                             height: 48.h,
-                                             fit: BoxFit.cover,
-                                             cacheWidth: (48.w * MediaQuery.of(context).devicePixelRatio).round(), // 缓存优化
-                                             cacheHeight: (48.h * MediaQuery.of(context).devicePixelRatio).round(),
-                                             errorBuilder: (context, error, stackTrace) {
-                                               return Icon(
-                                                 Icons.apps,
-                                                 color: Theme.of(context).colorScheme.primary,
-                                                 size: 28.w,
-                                               );
-                                             },
-                                           )
-                                         : Icon(
-                                             Icons.apps,
-                                             color: Theme.of(context).colorScheme.primary,
-                                             size: 28.w,
-                                           ),
+                                        ? Image.memory(
+                                            base64Decode(app['icon']),
+                                            width: 48.w,
+                                            height: 48.w,
+                                            fit: BoxFit.contain,
+                                            cacheWidth: (48.w * MediaQuery.of(context).devicePixelRatio).round(),
+                                            cacheHeight: (48.w * MediaQuery.of(context).devicePixelRatio).round(),
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Icon(
+                                                Icons.apps,
+                                                color: Theme.of(context).colorScheme.primary,
+                                                size: 28.w,
+                                              );
+                                            },
+                                          )
+                                        : Icon(
+                                            Icons.apps,
+                                            color: Theme.of(context).colorScheme.primary,
+                                            size: 28.w,
+                                          ),
                                   ),
                                 ),
-                                SizedBox(height: 4.h), // 增加图标和文字间距
+                                SizedBox(height: 4.h),
                                 Expanded(
                                   child: Text(
                                     app['name'] as String,
@@ -447,8 +437,8 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                       ),
                     );
                   },
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],
