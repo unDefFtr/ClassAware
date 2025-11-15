@@ -49,19 +49,25 @@ class ClassAwareApp extends StatelessWidget {
       useInheritedMediaQuery: true, // 使用继承的MediaQuery
       ensureScreenSize: true, // 确保屏幕尺寸正确
       builder: (context, child) {
+        final scheme = ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.light,
+        );
         return MaterialApp(
           title: '电子班牌',
           theme: ThemeData(
             useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
-              brightness: Brightness.light,
+            colorScheme: scheme,
+            scaffoldBackgroundColor: scheme.surface,
+            cardTheme: CardThemeData(
+              color: scheme.surface,
+              elevation: 0,
             ),
             // 针对触屏优化的主题设置，增大字体和组件尺寸
             visualDensity: VisualDensity.comfortable,
             materialTapTargetSize: MaterialTapTargetSize.padded,
             textTheme: Theme.of(context).textTheme.apply(
-              fontSizeFactor: 1.1, // 稍微减小字体缩放因子
+              fontSizeFactor: 1.1,
             ),
           ),
           home: const MainScreen(),

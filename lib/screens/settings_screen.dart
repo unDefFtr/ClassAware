@@ -210,7 +210,11 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
     required List<Widget> children,
   }) {
     return Card(
-      elevation: 2,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
       child: Padding(
         padding: EdgeInsets.all(16.w),
         child: Column(

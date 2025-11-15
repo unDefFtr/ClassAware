@@ -135,7 +135,7 @@ class CardHero extends StatelessWidget {
     required this.child,
     this.onTap,
     this.margin,
-    this.elevation = 4.0,
+    this.elevation = 0.0,
   });
 
   @override
@@ -144,7 +144,11 @@ class CardHero extends StatelessWidget {
       tag: heroTag,
       child: Card(
         margin: margin,
-        elevation: elevation,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),

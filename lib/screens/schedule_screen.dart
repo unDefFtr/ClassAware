@@ -320,6 +320,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> with AutomaticKeepAlive
 
   Widget _buildCurrentStatusCard(CourseInfo? currentCourse, CourseInfo? nextCourse) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
       child: Padding(
         padding: EdgeInsets.all(20.w),
         child: Column(
@@ -460,6 +465,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> with AutomaticKeepAlive
         SizedBox(height: 16.h),
         if (todayCourses.isEmpty) ...[
           Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
             child: Padding(
               padding: EdgeInsets.all(20.w),
               child: Center(
@@ -481,6 +491,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> with AutomaticKeepAlive
 
   Widget _buildCourseCard(CourseInfo course) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
       margin: EdgeInsets.only(bottom: 8.h),
       child: ListTile(
         leading: CircleAvatar(
@@ -524,6 +539,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> with AutomaticKeepAlive
         ),
         SizedBox(height: 16.h),
         Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.r),
+            side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+          ),
           child: Padding(
             padding: EdgeInsets.all(16.w),
             child: Column(
