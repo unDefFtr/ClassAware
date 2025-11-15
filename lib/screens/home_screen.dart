@@ -3,7 +3,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import '../services/schedule_service.dart';
-import '../models/schedule_models.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,48 +40,94 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   @override
   Widget build(BuildContext context) {
     super.build(context); // 必须调用，用于保持页面状态
-    
-    // 根据屏幕宽度确定边距，参考flutter_server_box项目的边距设置
     final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 600; // MD3平板断点
-    final screenMargin = isTablet ? 17.0 : 13.0; // 参考server_box：平板17dp，手机13dp
-    final cardPadding = isTablet ? 17.0 : 13.0; // 参考server_box：平板17dp，手机13dp
-    
+    final isTablet = screenWidth >= 600;
+    final screenMargin = isTablet ? 17.0 : 13.0;
+    final cardPadding = isTablet ? 17.0 : 13.0;
     return Scaffold(
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: screenMargin, 
-            vertical: isTablet ? 11.0 : 7.0, // 参考server_box：平板11dp，手机7dp
+            horizontal: screenMargin,
+            vertical: isTablet ? 11.0 : 7.0,
           ),
-          child: Row(
-            children: [
-              // 左侧列：时间天气卡片 + 班级信息卡片
-              Expanded(
-                flex: 3, // 从1增加到3
-                child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final h = constraints.maxHeight;
+              final ar = w / (h == 0 ? 1 : h);
+              final isWide = w >= 1000 || ar >= 1.4;
+              final isMedium = w >= 760 || ar >= 1.2;
+              if (isWide) {
+                return Row(
                   children: [
-                    // 左上角：时间和天气卡片
                     Expanded(
-                      flex: 1,
+                      flex: 3,
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: _buildTimeWeatherCard(cardPadding),
+                          ),
+                          SizedBox(height: 7.h),
+                          Expanded(
+                            child: _buildClassInfoCard(cardPadding),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 7.w),
+                    Expanded(
+                      flex: 4,
+                      child: _buildTodaySchedule(cardPadding),
+                    ),
+                  ],
+                );
+              }
+              if (isMedium) {
+                return Column(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildTimeWeatherCard(cardPadding),
+                          ),
+                          SizedBox(width: 7.w),
+                          Expanded(
+                            child: _buildClassInfoCard(cardPadding),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 7.h),
+                    Expanded(
+                      child: _buildTodaySchedule(cardPadding),
+                    ),
+                  ],
+                );
+              }
+              return SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: h * 0.35,
                       child: _buildTimeWeatherCard(cardPadding),
                     ),
-                    SizedBox(height: 7.h), // 减少卡片间距，参考server_box
-                    // 左下角：班级信息卡片
-                    Expanded(
-                      flex: 1,
+                    SizedBox(height: 7.h),
+                    SizedBox(
+                      height: h * 0.25,
                       child: _buildClassInfoCard(cardPadding),
+                    ),
+                    SizedBox(height: 7.h),
+                    SizedBox(
+                      height: h * 0.6,
+                      child: _buildTodaySchedule(cardPadding),
                     ),
                   ],
                 ),
-              ),
-              SizedBox(width: 7.w), // 减少水平间距，保持一致性
-              // 右侧：课程表卡片
-              Expanded(
-                flex: 4, // 从2增加到4，保持相对比例但给左侧更多空间
-                child: _buildTodaySchedule(cardPadding),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -197,14 +242,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             ),
             SizedBox(height: 12.h),
             Expanded(
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _weekWeather.length,
-                itemBuilder: (context, index) {
+              child: Row(
+                children: List.generate(_weekWeather.length, (index) {
                   final weather = _weekWeather[index];
-                  return Container(
-                    width: 60.w,
-                    margin: EdgeInsets.only(right: 12.w),
+                  return Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -218,10 +259,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                         Icon(
                           weather['icon'],
                           size: 20.w,
-                          color: weather['icon'] == Icons.wb_sunny 
-                              ? Colors.orange 
-                              : weather['icon'] == Icons.grain 
-                                  ? Colors.blue 
+                          color: weather['icon'] == Icons.wb_sunny
+                              ? Colors.orange
+                              : weather['icon'] == Icons.grain
+                                  ? Colors.blue
                                   : Colors.grey,
                         ),
                         Text(
@@ -241,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       ],
                     ),
                   );
-                },
+                }),
               ),
             ),
           ],
@@ -574,7 +615,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                                   ),
                                   SizedBox(height: 4.h),
                                   Text(
-                                    '${course.teacher ?? ''} • ${course.room ?? ''}',
+                                    '${course.teacher} • ${course.room}',
                                     style: TextStyle(
                                       fontSize: 16.sp,
                                       color: isCurrentTime 
