@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:installed_apps/installed_apps.dart';
+import 'package:flutter/services.dart';
 import 'dart:typed_data';
+import 'dart:convert';
 
 class AppsScreen extends StatefulWidget {
   const AppsScreen({super.key});
@@ -19,6 +21,9 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
   
   // 使用 ValueNotifier 来优化搜索性能
   final ValueNotifier<String> _searchNotifier = ValueNotifier<String>('');
+  
+  // MethodChannel for native Android communication
+  static const platform = MethodChannel('com.example.classaware/launcher');
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复加载应用列表
@@ -53,25 +58,30 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
       setState(() {
         _isLoading = true;
       });
+
+      // 使用原生Android方法获取可启动的应用
+      final List<dynamic> launchableApps = await platform.invokeMethod('getLaunchableApps');
       
-      // 获取已安装的用户应用（excludeSystemApps: true 过滤系统应用）
-      final apps = await InstalledApps.getInstalledApps(true, true);
+      List<Map<String, dynamic>> apps = [];
       
-      // 转换为Map格式
-      final appMaps = apps.map((app) => {
-        'name': app.name,
-        'packageName': app.packageName,
-        'icon': app.icon,
-      }).toList();
-      
+      for (var appData in launchableApps) {
+        final Map<String, dynamic> app = Map<String, dynamic>.from(appData);
+        
+        // 原生Android代码已经包含图标数据
+        apps.add(app);
+      }
+
       if (mounted) {
         setState(() {
-          _allApps = appMaps;
-          _filteredApps = List.from(appMaps);
+          _allApps = apps;
+          _filteredApps = List.from(apps);
           _isLoading = false;
         });
       }
+      
+      print('成功加载 ${_allApps.length} 个可启动应用');
     } catch (e) {
+      print('加载应用失败: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -252,14 +262,21 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12.r),
-                            child: app['icon'] != null
+                            child: app['icon'] != null && app['icon'].toString().isNotEmpty
                                 ? Image.memory(
-                                    Uint8List.fromList(app['icon'] as List<int>),
+                                    base64Decode(app['icon']),
                                     width: 48.w,
                                     height: 48.h,
                                     fit: BoxFit.cover,
                                     cacheWidth: (48.w * MediaQuery.of(context).devicePixelRatio).round(), // 缓存优化
                                     cacheHeight: (48.h * MediaQuery.of(context).devicePixelRatio).round(),
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Icon(
+                                        Icons.apps,
+                                        size: 24.sp,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      );
+                                    },
                                   )
                                 : Icon(
                                     Icons.apps,
@@ -386,14 +403,21 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(12.r),
-                                    child: app['icon'] != null
+                                    child: app['icon'] != null && app['icon'].toString().isNotEmpty
                                          ? Image.memory(
-                                             Uint8List.fromList(app['icon'] as List<int>),
+                                             base64Decode(app['icon']),
                                              width: 48.w,
                                              height: 48.h,
                                              fit: BoxFit.cover,
                                              cacheWidth: (48.w * MediaQuery.of(context).devicePixelRatio).round(), // 缓存优化
                                              cacheHeight: (48.h * MediaQuery.of(context).devicePixelRatio).round(),
+                                             errorBuilder: (context, error, stackTrace) {
+                                               return Icon(
+                                                 Icons.apps,
+                                                 color: Theme.of(context).colorScheme.primary,
+                                                 size: 28.w,
+                                               );
+                                             },
                                            )
                                          : Icon(
                                              Icons.apps,
@@ -432,5 +456,15 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
     );
   }
 
-
+  // 检查应用是否可以启动的辅助方法（已不再使用，但保留以备将来需要）
+  Future<bool> _canLaunchApp(String packageName) async {
+    try {
+      // 使用Android的启动Intent来检查应用是否有可启动的Activity
+      final uri = Uri.parse('package:$packageName');
+      return await canLaunchUrl(uri);
+    } catch (e) {
+      // 如果检查失败，返回false以排除该应用
+      return false;
+    }
+  }
 }

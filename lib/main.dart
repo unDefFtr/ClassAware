@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'screens/home_screen.dart';
 import 'screens/apps_screen.dart';
+import 'screens/schedule_screen.dart';
 import 'screens/settings_screen.dart';
 
 // 页面缓存包装器，防止页面重复构建
@@ -86,6 +87,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   
   final List<Widget> _screens = const [
     HomeScreen(),
+    ScheduleScreen(),
     AppsScreen(),
     SettingsScreen(),
   ];
@@ -145,6 +147,11 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                     icon: Icon(Icons.home_outlined),
                     selectedIcon: Icon(Icons.home),
                     label: Text('主页'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.schedule_outlined),
+                    selectedIcon: Icon(Icons.schedule),
+                    label: Text('课表'),
                   ),
                   NavigationRailDestination(
                     icon: Icon(Icons.apps_outlined),

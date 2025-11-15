@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
+import '../services/schedule_service.dart';
+import '../models/schedule_models.dart';
+import '../widgets/weather_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,49 +16,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   late Timer _timer;
   DateTime _currentTime = DateTime.now();
+  final ScheduleService _scheduleService = ScheduleService();
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复初始化定时器
-
-  // 示例课程表数据
-  final List<Map<String, dynamic>> _todaySchedule = [
-    {
-      'time': '08:00-08:45',
-      'subject': '语文',
-      'teacher': '张老师',
-      'room': '教室A101',
-    },
-    {
-      'time': '08:55-09:40',
-      'subject': '数学',
-      'teacher': '李老师',
-      'room': '教室A101',
-    },
-    {
-      'time': '09:50-10:35',
-      'subject': '英语',
-      'teacher': '王老师',
-      'room': '教室A101',
-    },
-    {
-      'time': '10:45-11:30',
-      'subject': '物理',
-      'teacher': '赵老师',
-      'room': '实验室B201',
-    },
-    {
-      'time': '14:00-14:45',
-      'subject': '化学',
-      'teacher': '陈老师',
-      'room': '实验室B202',
-    },
-    {
-      'time': '14:55-15:40',
-      'subject': '体育',
-      'teacher': '刘老师',
-      'room': '操场',
-    },
-  ];
 
   @override
   void initState() {
@@ -65,6 +29,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         _currentTime = DateTime.now();
       });
     });
+    // 加载本地课表数据
+    _scheduleService.loadScheduleFromLocal();
   }
 
   @override
@@ -76,10 +42,20 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   @override
   Widget build(BuildContext context) {
     super.build(context); // 必须调用，用于保持页面状态
+    
+    // 根据屏幕宽度确定边距，参考flutter_server_box项目的边距设置
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600; // MD3平板断点
+    final screenMargin = isTablet ? 17.0 : 13.0; // 参考server_box：平板17dp，手机13dp
+    final cardPadding = isTablet ? 17.0 : 13.0; // 参考server_box：平板17dp，手机13dp
+    
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(16.w), // MD3标准内边距
+          padding: EdgeInsets.symmetric(
+            horizontal: screenMargin, 
+            vertical: isTablet ? 11.0 : 7.0, // 参考server_box：平板11dp，手机7dp
+          ),
           child: Row(
             children: [
               // 左侧列：时间天气卡片 + 班级信息卡片
@@ -90,22 +66,22 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     // 左上角：时间和天气卡片
                     Expanded(
                       flex: 1,
-                      child: _buildTimeWeatherCard(),
+                      child: _buildTimeWeatherCard(cardPadding),
                     ),
-                    SizedBox(height: 16.h), // MD3标准卡片间距
+                    SizedBox(height: 7.h), // 减少卡片间距，参考server_box
                     // 左下角：班级信息卡片
                     Expanded(
                       flex: 1,
-                      child: _buildClassInfoCard(),
+                      child: _buildClassInfoCard(cardPadding),
                     ),
                   ],
                 ),
               ),
-              SizedBox(width: 16.w), // MD3标准卡片间距
+              SizedBox(width: 7.w), // 减少水平间距，保持一致性
               // 右侧：课程表卡片
               Expanded(
                 flex: 4, // 从2增加到4，保持相对比例但给左侧更多空间
-                child: _buildTodaySchedule(),
+                child: _buildTodaySchedule(cardPadding),
               ),
             ],
           ),
@@ -125,149 +101,43 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     {'day': '周日', 'icon': Icons.grain, 'high': 22, 'low': 15, 'desc': '阵雨'},
   ];
 
-  Widget _buildTimeWeatherCard() {
+  Widget _buildTimeWeatherCard(double cardPadding) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16.r),
       ),
       child: Padding(
-        padding: EdgeInsets.all(20.w),
+        padding: EdgeInsets.all(cardPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 上半部分：时间和天气并排
-            Row(
+            // 上半部分：时间显示
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 左侧：时间显示
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        DateFormat('HH:mm').format(_currentTime),
-                        style: TextStyle(
-                          fontSize: 48.sp,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      Text(
-                        DateFormat('yyyy年MM月dd日').format(_currentTime),
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                Text(
+                  DateFormat('HH:mm').format(_currentTime),
+                  style: TextStyle(
+                    fontSize: 48.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                SizedBox(width: 20.w),
-                // 右侧：天气信息
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Icon(
-                            Icons.wb_sunny,
-                            size: 32.w,
-                            color: Colors.orange,
-                          ),
-                          SizedBox(width: 8.w),
-                          Text(
-                            '25°C',
-                            style: TextStyle(
-                              fontSize: 32.sp,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8.h),
-                      Text(
-                        '晴天',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        '空气质量良好',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                SizedBox(height: 8.h),
+                Text(
+                  DateFormat('yyyy年MM月dd日').format(_currentTime),
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 24.h),
-            // 下半部分：7天天气预报
-            Text(
-              '未来7天',
-              style: TextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            SizedBox(height: 12.h),
+            SizedBox(height: 16.h),
+            // 下半部分：天气组件
             Expanded(
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _weekWeather.length,
-                itemBuilder: (context, index) {
-                  final weather = _weekWeather[index];
-                  return Container(
-                    width: 60.w,
-                    margin: EdgeInsets.only(right: 12.w),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Text(
-                          weather['day'],
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        Icon(
-                          weather['icon'],
-                          size: 20.w,
-                          color: weather['icon'] == Icons.wb_sunny 
-                              ? Colors.orange 
-                              : weather['icon'] == Icons.grain 
-                                  ? Colors.blue 
-                                  : Colors.grey,
-                        ),
-                        Text(
-                          '${weather['high']}°',
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          '${weather['low']}°',
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+              child: const WeatherWidget(),
             ),
           ],
         ),
@@ -275,13 +145,13 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
   }
 
-  Widget _buildClassInfoCard() {
+  Widget _buildClassInfoCard(double cardPadding) {
     return Card(
       elevation: 2, // 增加阴影
       child: Container(
         width: double.infinity,
         height: double.infinity,
-        padding: EdgeInsets.all(20.w), // 减小内边距
+        padding: EdgeInsets.all(cardPadding), // 使用响应式内边距
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -327,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 ),
               ],
             ),
-            SizedBox(height: 16.h), // 减小间距
+            SizedBox(height: 10.h), // 减少间距，参考server_box
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -336,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 Expanded(child: _buildInfoItem('出勤率', '98%', Icons.check_circle)),
               ],
             ),
-            SizedBox(height: 16.h), // 减小间距
+            SizedBox(height: 10.h), // 减少间距，参考server_box
             Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h), // 减小内边距
@@ -407,13 +277,13 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
   }
 
-  Widget _buildTodaySchedule() {
+  Widget _buildTodaySchedule(double cardPadding) {
     return Card(
       elevation: 2, // 增加阴影
       child: Container(
         width: double.infinity,
         height: double.infinity,
-        padding: EdgeInsets.all(16.w), // MD3标准内边距
+        padding: EdgeInsets.all(cardPadding), // 使用响应式内边距
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -435,107 +305,201 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 ),
               ],
             ),
-            SizedBox(height: 18.h), // 减小间距，从24.h改为18.h
+            SizedBox(height: 13.h), // 减少间距，参考server_box
             Expanded(
-              child: ListView.separated(
-                itemCount: _todaySchedule.length,
-                separatorBuilder: (context, index) => SizedBox(height: 12.h), // MD3标准列表项间距
-                itemBuilder: (context, index) {
-                  final course = _todaySchedule[index];
-                  final isCurrentTime = _isCurrentCourse(course['time']);
+              child: Builder(
+                builder: (context) {
+                  final todayCourses = _scheduleService.getCoursesForDay(DateTime.now());
                   
-                  return Container(
-                    padding: EdgeInsets.all(12.w), // MD3标准列表项内边距
-                    decoration: BoxDecoration(
-                      color: isCurrentTime 
-                          ? Theme.of(context).colorScheme.primaryContainer
-                          : Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12.r), // 减小圆角，从16.r改为12.r
-                      border: isCurrentTime 
-                          ? Border.all(
-                              color: Theme.of(context).colorScheme.primary,
-                              width: 2,
-                            )
-                          : null,
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 90.w, // 稍微增加宽度以适应两行显示
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                course['time'].split('-')[0], // 开始时间
-                                style: TextStyle(
-                                  fontSize: 15.sp,
-                                  fontWeight: FontWeight.w600,
-                                  color: isCurrentTime 
-                                      ? Theme.of(context).colorScheme.onPrimaryContainer
-                                      : Theme.of(context).colorScheme.onSurface,
-                                ),
-                              ),
-                              SizedBox(height: 2.h),
-                              Text(
-                                course['time'].split('-')[1], // 结束时间
-                                style: TextStyle(
-                                  fontSize: 14.sp,
-                                  fontWeight: FontWeight.w400,
-                                  color: isCurrentTime 
-                                      ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
-                                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
+                  if (todayCourses.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.schedule_outlined,
+                            size: 60.w,
+                            color: Theme.of(context).colorScheme.outline,
                           ),
-                        ),
-                        SizedBox(width: 18.w), // 稍微增加间距以适应两行时间显示
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                course['subject'],
-                                style: TextStyle(
-                                  fontSize: 20.sp, // 减小字体，从24.sp改为20.sp
-                                  fontWeight: FontWeight.bold,
-                                  color: isCurrentTime 
-                                      ? Theme.of(context).colorScheme.onPrimaryContainer
-                                      : Theme.of(context).colorScheme.onSurface,
-                                ),
-                              ),
-                              SizedBox(height: 4.h), // 减小间距，从6.h改为4.h
-                              Text(
-                                '${course['teacher']} • ${course['room']}',
-                                style: TextStyle(
-                                  fontSize: 16.sp, // 减小字体，从18.sp改为16.sp
-                                  color: isCurrentTime 
-                                      ? Theme.of(context).colorScheme.onPrimaryContainer
-                                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isCurrentTime)
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h), // 减小内边距
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              borderRadius: BorderRadius.circular(8.r), // 减小圆角，从10.r改为8.r
-                            ),
-                            child: Text(
-                              '进行中',
-                              style: TextStyle(
-                                fontSize: 14.sp, // 减小字体，从16.sp改为14.sp
-                                fontWeight: FontWeight.w500,
-                                color: Theme.of(context).colorScheme.onPrimary,
-                              ),
+                          SizedBox(height: 16.h),
+                          Text(
+                            '今日无课程安排',
+                            style: TextStyle(
+                              fontSize: 18.sp,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
-                      ],
-                    ),
+                          SizedBox(height: 8.h),
+                          Text(
+                            '请在课表页面导入课表数据',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  
+                  return ListView.separated(
+                    itemCount: todayCourses.length,
+                    separatorBuilder: (context, index) => SizedBox(height: 7.h),
+                    itemBuilder: (context, index) {
+                      final course = todayCourses[index];
+                      final isCurrentTime = _isCurrentCourse('${course.startTime}-${course.endTime}');
+                      
+                      return Container(
+                        padding: EdgeInsets.all(10.w),
+                        decoration: BoxDecoration(
+                          color: isCurrentTime 
+                              ? Theme.of(context).colorScheme.primaryContainer
+                              : Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: isCurrentTime 
+                              ? Border.all(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  width: 2,
+                                )
+                              : null,
+                          boxShadow: isCurrentTime 
+                              ? [
+                                  BoxShadow(
+                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            // 添加正在上课的指示器
+                            if (isCurrentTime)
+                              Container(
+                                width: 4.w,
+                                height: 60.h,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(2.r),
+                                ),
+                              ),
+                            if (isCurrentTime) SizedBox(width: 12.w),
+                            Container(
+                              width: 90.w,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        course.startTime, // 开始时间
+                                        style: TextStyle(
+                                          fontSize: 15.sp,
+                                          fontWeight: FontWeight.w600,
+                                          color: isCurrentTime 
+                                              ? Theme.of(context).colorScheme.onPrimaryContainer
+                                              : Theme.of(context).colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      if (isCurrentTime) ...[
+                                        SizedBox(width: 4.w),
+                                        Container(
+                                          width: 6.w,
+                                          height: 6.w,
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.primary,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  SizedBox(height: 2.h),
+                                  Text(
+                                    course.endTime, // 结束时间
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w400,
+                                      color: isCurrentTime 
+                                          ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
+                                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: 18.w),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          course.name,
+                                          style: TextStyle(
+                                            fontSize: 20.sp,
+                                            fontWeight: FontWeight.bold,
+                                            color: isCurrentTime 
+                                                ? Theme.of(context).colorScheme.onPrimaryContainer
+                                                : Theme.of(context).colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isCurrentTime)
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.primary,
+                                            borderRadius: BorderRadius.circular(12.r),
+                                          ),
+                                          child: Text(
+                                            '正在上课',
+                                            style: TextStyle(
+                                              fontSize: 12.sp,
+                                              fontWeight: FontWeight.w600,
+                                              color: Theme.of(context).colorScheme.onPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 4.h),
+                                  Text(
+                                    '${course.teacher ?? ''} • ${course.room ?? ''}',
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      color: isCurrentTime 
+                                          ? Theme.of(context).colorScheme.onPrimaryContainer
+                                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isCurrentTime)
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Text(
+                                  '进行中',
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w500,
+                                    color: Theme.of(context).colorScheme.onPrimary,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
                   );
                 },
               ),
