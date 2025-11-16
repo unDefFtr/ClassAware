@@ -40,6 +40,7 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
   @override
   void dispose() {
     _searchNotifier.dispose();
+    AuthService.instance.lockIfHighSecurity();
     super.dispose();
   }
 

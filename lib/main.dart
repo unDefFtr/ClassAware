@@ -124,6 +124,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   Future<void> _handleDestination(int index) async {
     if (_selectIndex.value == index) return;
     if (index < 0 || index >= _screens.length) return;
+    final prevIndex = _selectIndex.value;
     final prefs = await SharedPreferences.getInstance();
     final authEnabled = prefs.getBool('auth_enabled') ?? false;
     final lockApps = prefs.getBool('lock_apps') ?? false;
@@ -146,6 +147,11 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 677),
       curve: Curves.fastLinearToSlowEaseIn,
     );
+    final wasSensitive = (prevIndex == 2 && lockApps) || (prevIndex == 3 && lockSettings);
+    final destSensitive = (index == 2 && lockApps) || (index == 3 && lockSettings);
+    if (wasSensitive && !destSensitive) {
+      await AuthService.instance.lockIfHighSecurity();
+    }
     Future.delayed(const Duration(milliseconds: 677), () {
       _switchingPage = false;
     });

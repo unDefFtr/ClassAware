@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/city_database_service.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../services/auth_service.dart';
@@ -21,6 +22,8 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   double _fontSize = 16.0;
   String _className = '高三(1)班';
   String _teacherName = '张老师';
+  String _weatherCityId = '';
+  int _weatherRefreshMinutes = 5;
   bool _authEnabled = false;
   bool _lockApps = true;
   bool _lockSettings = true;
@@ -30,6 +33,8 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   List<String> _authNfcUids = [];
   int _authUnlockMinutes = 10;
   final TextEditingController _unlockMinutesController = TextEditingController(text: '10');
+  bool _authHighSecurity = false;
+  final TextEditingController _weatherRefreshController = TextEditingController(text: '5');
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复加载设置
@@ -50,6 +55,9 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       _fontSize = prefs.getDouble('font_size') ?? 16.0;
       _className = prefs.getString('class_name') ?? '高三(1)班';
       _teacherName = prefs.getString('teacher_name') ?? '张老师';
+      _weatherCityId = prefs.getString('weather_city_id') ?? '';
+      _weatherRefreshMinutes = prefs.getInt('weather_refresh_minutes') ?? 5;
+      _weatherRefreshController.text = _weatherRefreshMinutes.toString();
       _authEnabled = prefs.getBool('auth_enabled') ?? false;
       _lockApps = prefs.getBool('lock_apps') ?? true;
       _lockSettings = prefs.getBool('lock_settings') ?? true;
@@ -59,6 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       _authNfcUids = prefs.getStringList('auth_nfc_uids') ?? [];
       _authUnlockMinutes = prefs.getInt('auth_unlock_minutes') ?? 10;
       _unlockMinutesController.text = _authUnlockMinutes.toString();
+      _authHighSecurity = prefs.getBool('auth_high_security') ?? false;
     });
   }
 
@@ -75,6 +84,68 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
     } else if (value is int) {
       await prefs.setInt(key, value);
     }
+  }
+
+  void _openCitySearch() async {
+    final service = CityDatabaseService();
+    final popular = await service.getPopularCities();
+    final controller = TextEditingController();
+    List<City> results = popular;
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              title: const Text('搜索城市'),
+              content: SizedBox(
+                width: 480.w,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      decoration: const InputDecoration(
+                        hintText: '输入城市名称，如 北京',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onChanged: (v) async {
+                        final q = v.trim();
+                        final list = q.isEmpty ? await service.getPopularCities() : await service.searchCitiesByName(q);
+                        setState(() { results = list; });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 360,
+                      child: ListView.builder(
+                        itemCount: results.length,
+                        itemBuilder: (ctx, i) {
+                          final c = results[i];
+                          return ListTile(
+                            title: Text(c.name),
+                            subtitle: Text('编码: ${c.cityNum}'),
+                            onTap: () { Navigator.of(ctx).pop(c.cityNum); },
+                          );
+                        },
+                      ),
+                    )
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消'))
+              ],
+            );
+          },
+        );
+      },
+    ).then((value) {
+      if (value is String && value.isNotEmpty) {
+        setState(() { _weatherCityId = value; });
+        _saveSetting('weather_city_id', value);
+      }
+    });
   }
 
   @override
@@ -176,6 +247,15 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                   _saveSetting('auth_use_nfc', v);
                 },
               ),
+              _buildSwitchTile(
+                title: '高安全性',
+                subtitle: '离开敏感页面后立即锁定',
+                value: _authHighSecurity,
+                onChanged: (v) {
+                  setState(() { _authHighSecurity = v; });
+                  _saveSetting('auth_high_security', v);
+                },
+              ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('会话时长'),
@@ -272,6 +352,47 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                     _saveSetting('show_weather', value);
                   },
                 ),
+                _buildTextFieldTile(
+                  title: '天气城市编码',
+                  value: _weatherCityId,
+                  onChanged: (value) {
+                    setState(() {
+                      _weatherCityId = value;
+                    });
+                    _saveSetting('weather_city_id', value);
+                  },
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _openCitySearch,
+                      icon: const Icon(Icons.search),
+                      label: const Text('搜索城市并填充编码'),
+                    ),
+                  ),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('天气刷新频率(分钟)'),
+                  subtitle: const Text('默认 5，范围 1-60'),
+                  trailing: SizedBox(
+                    width: 120.w,
+                    child: TextField(
+                      controller: _weatherRefreshController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onSubmitted: (v) {
+                        final parsed = int.tryParse(v);
+                        final mins = (parsed ?? _weatherRefreshMinutes).clamp(1, 60);
+                        setState(() { _weatherRefreshMinutes = mins; _weatherRefreshController.text = mins.toString(); });
+                        _saveSetting('weather_refresh_minutes', mins);
+                      },
+                      decoration: const InputDecoration(hintText: '1-60'),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -341,6 +462,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   @override
   void dispose() {
     _unlockMinutesController.dispose();
+    AuthService.instance.lockIfHighSecurity();
     super.dispose();
   }
 

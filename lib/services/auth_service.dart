@@ -119,6 +119,14 @@ class AuthService {
     authActive.value = false;
   }
 
+  Future<void> lockIfHighSecurity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final high = prefs.getBool('auth_high_security') ?? false;
+    if (high) {
+      forceLock();
+    }
+  }
+
   Future<bool> _authBiometrics() async {
     final auth = LocalAuthentication();
     final canCheck = await auth.canCheckBiometrics;
