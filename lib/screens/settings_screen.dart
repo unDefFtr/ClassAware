@@ -159,7 +159,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
           // 班级信息设置
           RepaintBoundary( // 添加重绘边界优化
             child: _buildSectionCard(
-              title: '班级信息',
+              title: '快速信息',
               icon: Icons.school,
               children: [
                 _buildTextFieldTile(
@@ -181,6 +181,57 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                     });
                     _saveSetting('teacher_name', value);
                   },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    '显示天气',
+                    style: TextStyle(fontSize: 16.sp),
+                  ),
+                  subtitle: Text(
+                    _weatherCityId.isNotEmpty
+                        ? '当前城市编码: $_weatherCityId'
+                        : '未选择城市编码',
+                    style: TextStyle(fontSize: 14.sp),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton.icon(
+                        onPressed: _openCitySearch,
+                        icon: const Icon(Icons.search),
+                        label: const Text('搜索'),
+                      ),
+                      SizedBox(width: 8.w),
+                      Switch(
+                        value: _showWeather,
+                        onChanged: (value) {
+                          setState(() { _showWeather = value; });
+                          _saveSetting('show_weather', value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('天气刷新频率(分钟)'),
+                  subtitle: const Text('默认 5，范围 1-60'),
+                  trailing: SizedBox(
+                    width: 120.w,
+                    child: TextField(
+                      controller: _weatherRefreshController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onSubmitted: (v) {
+                        final parsed = int.tryParse(v);
+                        final mins = (parsed ?? _weatherRefreshMinutes).clamp(1, 60);
+                        setState(() { _weatherRefreshMinutes = mins; _weatherRefreshController.text = mins.toString(); });
+                        _saveSetting('weather_refresh_minutes', mins);
+                      },
+                      decoration: const InputDecoration(hintText: '1-60'),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -341,57 +392,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                     _saveSetting('font_size', value);
                   },
                 ),
-                _buildSwitchTile(
-                  title: '显示天气',
-                  subtitle: '在主页显示天气信息',
-                  value: _showWeather,
-                  onChanged: (value) {
-                    setState(() {
-                      _showWeather = value;
-                    });
-                    _saveSetting('show_weather', value);
-                  },
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: _openCitySearch,
-                      icon: const Icon(Icons.search),
-                      label: const Text('搜索城市并填充编码'),
-                    ),
-                  ),
-                ),
-                if (_weatherCityId.isNotEmpty)
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24.w),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('已选择编码: $_weatherCityId',
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                    ),
-                  ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('天气刷新频率(分钟)'),
-                  subtitle: const Text('默认 5，范围 1-60'),
-                  trailing: SizedBox(
-                    width: 120.w,
-                    child: TextField(
-                      controller: _weatherRefreshController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      onSubmitted: (v) {
-                        final parsed = int.tryParse(v);
-                        final mins = (parsed ?? _weatherRefreshMinutes).clamp(1, 60);
-                        setState(() { _weatherRefreshMinutes = mins; _weatherRefreshController.text = mins.toString(); });
-                        _saveSetting('weather_refresh_minutes', mins);
-                      },
-                      decoration: const InputDecoration(hintText: '1-60'),
-                    ),
-                  ),
-                ),
+                
               ],
             ),
           ),

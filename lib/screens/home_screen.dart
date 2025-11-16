@@ -515,71 +515,46 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       final isCurrentTime = _isCurrentCourse('${course.startTime}-${course.endTime}');
                       
                       return Container(
-                        padding: EdgeInsets.all(10.w),
+                        padding: EdgeInsets.fromLTRB(10.w - (isCurrentTime ? 2.0 : 0.0), 10.w, 10.w - (isCurrentTime ? 2.0 : 0.0), 10.w),
                         decoration: BoxDecoration(
-                          color: isCurrentTime 
+                          color: isCurrentTime
                               ? Theme.of(context).colorScheme.primaryContainer
                               : Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12.r),
-                          border: isCurrentTime 
+                          border: isCurrentTime
                               ? Border.all(
                                   color: Theme.of(context).colorScheme.primary,
                                   width: 2,
                                 )
                               : null,
-                          boxShadow: isCurrentTime 
+                          boxShadow: isCurrentTime
                               ? [
                                   BoxShadow(
                                     color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                                     blurRadius: 8,
-                                    offset: Offset(0, 2),
+                                    offset: const Offset(0, 2),
                                   ),
                                 ]
                               : null,
                         ),
                         child: Row(
                           children: [
-                            // 添加正在上课的指示器
-                            if (isCurrentTime)
-                              Container(
-                                width: 4.w,
-                                height: 60.h,
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  borderRadius: BorderRadius.circular(2.r),
-                                ),
-                              ),
-                            if (isCurrentTime) SizedBox(width: 12.w),
+                            // 删除左侧竖线指示器
                             Container(
                               width: 90.w,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        course.startTime, // 开始时间
-                                        style: TextStyle(
-                                          fontSize: 15.sp,
-                                          fontWeight: FontWeight.w600,
-                                          color: isCurrentTime 
-                                              ? Theme.of(context).colorScheme.onPrimaryContainer
-                                              : Theme.of(context).colorScheme.onSurface,
-                                        ),
-                                      ),
-                                      if (isCurrentTime) ...[
-                                        SizedBox(width: 4.w),
-                                        Container(
-                                          width: 6.w,
-                                          height: 6.w,
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.primary,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
+                                  Text(
+                                    course.startTime, // 开始时间
+                                    style: TextStyle(
+                                      fontSize: 15.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: isCurrentTime 
+                                          ? Theme.of(context).colorScheme.onPrimaryContainer
+                                          : Theme.of(context).colorScheme.onSurface,
+                                    ),
                                   ),
                                   SizedBox(height: 2.h),
                                   Text(
@@ -614,22 +589,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                                           ),
                                         ),
                                       ),
-                                      if (isCurrentTime)
-                                        Container(
-                                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.primary,
-                                            borderRadius: BorderRadius.circular(12.r),
-                                          ),
-                                          child: Text(
-                                            '正在上课',
-                                            style: TextStyle(
-                                              fontSize: 12.sp,
-                                              fontWeight: FontWeight.w600,
-                                              color: Theme.of(context).colorScheme.onPrimary,
-                                            ),
-                                          ),
-                                        ),
+                                      // 删除右侧“正在上课”标签，仅保留下方“进行中”
                                     ],
                                   ),
                                   SizedBox(height: 4.h),
@@ -874,24 +834,21 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   bool _isCurrentCourse(String timeRange) {
-    // 简单的时间判断逻辑，实际应用中可以更精确
     final now = _currentTime;
-    final currentHour = now.hour;
-    final currentMinute = now.minute;
-    final currentTimeInMinutes = currentHour * 60 + currentMinute;
-    
-    // 解析时间范围 (例如: "08:00-08:45")
-    final times = timeRange.split('-');
-    if (times.length != 2) return false;
-    
-    final startTime = times[0].split(':');
-    final endTime = times[1].split(':');
-    
-    if (startTime.length != 2 || endTime.length != 2) return false;
-    
-    final startMinutes = int.parse(startTime[0]) * 60 + int.parse(startTime[1]);
-    final endMinutes = int.parse(endTime[0]) * 60 + int.parse(endTime[1]);
-    
+    final currentTimeInMinutes = now.hour * 60 + now.minute;
+    int? parseToMinutes(String s) {
+      final t = s.trim();
+      final m = RegExp(r'^(\d{1,2}):(\d{2})(?::(\d{2}))?$').firstMatch(t);
+      if (m == null) return null;
+      final h = int.parse(m.group(1)!);
+      final min = int.parse(m.group(2)!);
+      return h * 60 + min;
+    }
+    final parts = timeRange.split('-');
+    if (parts.length != 2) return false;
+    final startMinutes = parseToMinutes(parts[0]);
+    final endMinutes = parseToMinutes(parts[1]);
+    if (startMinutes == null || endMinutes == null) return false;
     return currentTimeInMinutes >= startMinutes && currentTimeInMinutes <= endMinutes;
   }
 }
