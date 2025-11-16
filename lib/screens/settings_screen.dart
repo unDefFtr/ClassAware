@@ -352,16 +352,6 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                     _saveSetting('show_weather', value);
                   },
                 ),
-                _buildTextFieldTile(
-                  title: '天气城市编码',
-                  value: _weatherCityId,
-                  onChanged: (value) {
-                    setState(() {
-                      _weatherCityId = value;
-                    });
-                    _saveSetting('weather_city_id', value);
-                  },
-                ),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: Align(
@@ -373,6 +363,15 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                     ),
                   ),
                 ),
+                if (_weatherCityId.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24.w),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('已选择编码: $_weatherCityId',
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    ),
+                  ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('天气刷新频率(分钟)'),
