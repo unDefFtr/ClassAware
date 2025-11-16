@@ -396,12 +396,17 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                 final minTile = 96.0;
                 final spacing = (w * 0.01).clamp(4.0, 16.0);
                 final cols = (w / (minTile + spacing)).floor().clamp(4, 18);
+                final iconSize = 48.w;
+                final fontSize = 11.sp;
+                final textHeight = fontSize * 1.2 * 2;
+                final tileHeight = iconSize + 4.h + textHeight + 12.0;
+                final aspect = (minTile / tileHeight).clamp(0.65, 1.0);
                 return GridView.builder(
                   physics: const BouncingScrollPhysics(),
                   shrinkWrap: true,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: cols,
-                    childAspectRatio: 0.95,
+                    childAspectRatio: aspect,
                     crossAxisSpacing: spacing,
                     mainAxisSpacing: spacing,
                   ),
@@ -452,7 +457,8 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                                   ),
                                 ),
                                 SizedBox(height: 4.h),
-                                Expanded(
+                                SizedBox(
+                                  height: textHeight,
                                   child: Text(
                                     app['name'] as String,
                                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
