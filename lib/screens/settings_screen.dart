@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/system_info.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/city_database_service.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
@@ -35,6 +37,12 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   final TextEditingController _unlockMinutesController = TextEditingController(text: '10');
   bool _authHighSecurity = false;
   final TextEditingController _weatherRefreshController = TextEditingController(text: '5');
+  int _studentCount = 45;
+  int _teacherCount = 5;
+  final TextEditingController _studentCountController = TextEditingController(text: '45');
+  final TextEditingController _teacherCountController = TextEditingController(text: '5');
+  bool _fakeEnabled = false;
+  double _fakeThreshold = 50.0;
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复加载设置
@@ -68,6 +76,10 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       _authUnlockMinutes = prefs.getInt('auth_unlock_minutes') ?? 10;
       _unlockMinutesController.text = _authUnlockMinutes.toString();
       _authHighSecurity = prefs.getBool('auth_high_security') ?? false;
+      _studentCount = prefs.getInt('student_count') ?? 45;
+      _teacherCount = prefs.getInt('teacher_count') ?? 5;
+      _studentCountController.text = _studentCount.toString();
+      _teacherCountController.text = _teacherCount.toString();
     });
   }
 
@@ -151,6 +163,77 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   @override
   Widget build(BuildContext context) {
     super.build(context); // 必须调用，用于保持页面状态
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isLandscape) {
+      final quickInfo = RepaintBoundary(child: _buildSectionCard(title: '快速信息', icon: Icons.school, children: _quickInfoChildren()));
+      final auth = RepaintBoundary(child: _buildSectionCard(title: '身份验证', icon: Icons.verified_user, children: _authChildren()));
+      final display = RepaintBoundary(child: _buildSectionCard(title: '显示设置', icon: Icons.display_settings, children: _displayChildren()));
+      final system = RepaintBoundary(child: _buildSectionCard(title: '系统信息', icon: Icons.info, children: _systemChildren()));
+      final actions = RepaintBoundary(child: _buildActionButtons());
+      final vh = MediaQuery.of(context).size.height;
+      return Scaffold(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final margin = 16.w;
+            final gap = margin;
+            final visibleCols = 3;
+            final colW = (constraints.maxWidth - margin * 2 - gap * (visibleCols - 1)) / visibleCols;
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: margin),
+                child: Row(
+                  children: [
+                  SizedBox(
+                    width: colW,
+                    height: vh,
+                    child: ListView(
+                      padding: EdgeInsets.symmetric(vertical: 16.w),
+                      physics: const BouncingScrollPhysics(),
+                      children: [quickInfo, SizedBox(height: 16.h), display],
+                    ),
+                  ),
+                  SizedBox(width: gap),
+                  SizedBox(
+                    width: colW,
+                    height: vh,
+                    child: ListView(
+                      padding: EdgeInsets.symmetric(vertical: 16.w),
+                      physics: const BouncingScrollPhysics(),
+                      children: [auth],
+                    ),
+                  ),
+                  SizedBox(width: gap),
+                  SizedBox(
+                    width: colW,
+                    height: vh,
+                    child: ListView(
+                      padding: EdgeInsets.symmetric(vertical: 16.w),
+                      physics: const BouncingScrollPhysics(),
+                      children: [system, SizedBox(height: 16.h), actions],
+                    ),
+                  ),
+                  SizedBox(width: gap),
+                  SizedBox(
+                    width: colW,
+                    height: vh,
+                    child: ListView(
+                      padding: EdgeInsets.symmetric(vertical: 16.w),
+                      physics: const BouncingScrollPhysics(),
+                      children: [
+                        RepaintBoundary(child: _buildSectionCard(title: '其它设置(测试)', icon: Icons.tune, children: _fakeChildren())),
+                      ],
+                    ),
+                  ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
     return Scaffold(
       body: ListView(
         padding: EdgeInsets.all(16.w),
@@ -181,6 +264,60 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                     });
                     _saveSetting('teacher_name', value);
                   },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('学生人数'),
+                  trailing: SizedBox(
+                    width: 120.w,
+                    child: TextField(
+                      controller: _studentCountController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onChanged: (v) {
+                        final parsed = int.tryParse(v);
+                        if (parsed != null) {
+                          final n = parsed.clamp(0, 200);
+                          setState(() { _studentCount = n; });
+                          _saveSetting('student_count', n);
+                        }
+                      },
+                      onSubmitted: (v) {
+                        final parsed = int.tryParse(v) ?? _studentCount;
+                        final n = parsed.clamp(0, 200);
+                        setState(() { _studentCount = n; _studentCountController.text = n.toString(); });
+                        _saveSetting('student_count', n);
+                      },
+                      decoration: const InputDecoration(hintText: '0-200'),
+                    ),
+                  ),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('老师人数'),
+                  trailing: SizedBox(
+                    width: 120.w,
+                    child: TextField(
+                      controller: _teacherCountController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onChanged: (v) {
+                        final parsed = int.tryParse(v);
+                        if (parsed != null) {
+                          final n = parsed.clamp(0, 50);
+                          setState(() { _teacherCount = n; });
+                          _saveSetting('teacher_count', n);
+                        }
+                      },
+                      onSubmitted: (v) {
+                        final parsed = int.tryParse(v) ?? _teacherCount;
+                        final n = parsed.clamp(0, 50);
+                        setState(() { _teacherCount = n; _teacherCountController.text = n.toString(); });
+                        _saveSetting('teacher_count', n);
+                      },
+                      decoration: const InputDecoration(hintText: '0-50'),
+                    ),
+                  ),
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -329,21 +466,22 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                 ),
               ),
               SizedBox(height: 8.h),
-              Row(
+              Wrap(
+                spacing: 8.w,
+                runSpacing: 8.h,
                 children: [
                   OutlinedButton.icon(
                     onPressed: _setPin,
-                      icon: const Icon(Icons.password),
-                      label: const Text('设置数字密码'),
-                    ),
-                    SizedBox(width: 8.w),
-                    OutlinedButton.icon(
-                      onPressed: _addNfcUid,
-                      icon: const Icon(Icons.nfc),
-                      label: const Text('添加 NFC 卡'),
-                    ),
-                  ],
-                ),
+                    icon: const Icon(Icons.password),
+                    label: const Text('设置数字密码'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _addNfcUid,
+                    icon: const Icon(Icons.nfc),
+                    label: const Text('添加 NFC 卡'),
+                  ),
+                ],
+              ),
                 SizedBox(height: 8.h),
                 Wrap(
                   spacing: 8.w,
@@ -459,10 +597,213 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
     );
   }
 
+  List<Widget> _quickInfoChildren() {
+    return [
+      _buildTextFieldTile(
+        title: '班级名称',
+        value: _className,
+        onChanged: (value) {
+          setState(() { _className = value; });
+          _saveSetting('class_name', value);
+        },
+      ),
+      _buildTextFieldTile(
+        title: '班主任姓名',
+        value: _teacherName,
+        onChanged: (value) {
+          setState(() { _teacherName = value; });
+          _saveSetting('teacher_name', value);
+        },
+      ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('学生人数'),
+        trailing: SizedBox(
+          width: 120.w,
+          child: TextField(
+            controller: _studentCountController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (v) {
+              final parsed = int.tryParse(v);
+              if (parsed != null) {
+                final n = parsed.clamp(0, 200);
+                setState(() { _studentCount = n; });
+                _saveSetting('student_count', n);
+              }
+            },
+            onSubmitted: (v) {
+              final parsed = int.tryParse(v) ?? _studentCount;
+              final n = parsed.clamp(0, 200);
+              setState(() { _studentCount = n; _studentCountController.text = n.toString(); });
+              _saveSetting('student_count', n);
+            },
+            decoration: const InputDecoration(hintText: '0-200'),
+          ),
+        ),
+      ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('老师人数'),
+        trailing: SizedBox(
+          width: 120.w,
+          child: TextField(
+            controller: _teacherCountController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (v) {
+              final parsed = int.tryParse(v);
+              if (parsed != null) {
+                final n = parsed.clamp(0, 50);
+                setState(() { _teacherCount = n; });
+                _saveSetting('teacher_count', n);
+              }
+            },
+            onSubmitted: (v) {
+              final parsed = int.tryParse(v) ?? _teacherCount;
+              final n = parsed.clamp(0, 50);
+              setState(() { _teacherCount = n; _teacherCountController.text = n.toString(); });
+              _saveSetting('teacher_count', n);
+            },
+            decoration: const InputDecoration(hintText: '0-50'),
+          ),
+        ),
+      ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text('显示天气', style: TextStyle(fontSize: 16.sp)),
+        subtitle: Text(
+          _weatherCityId.isNotEmpty ? '当前城市编码: $_weatherCityId' : '未选择城市编码',
+          style: TextStyle(fontSize: 14.sp),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton.icon(onPressed: _openCitySearch, icon: const Icon(Icons.search), label: const Text('搜索')),
+            SizedBox(width: 8.w),
+            Switch(value: _showWeather, onChanged: (v) { setState(() { _showWeather = v; }); _saveSetting('show_weather', v); }),
+          ],
+        ),
+      ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('天气刷新频率(分钟)'),
+        subtitle: const Text('默认 5，范围 1-60'),
+        trailing: SizedBox(
+          width: 120.w,
+          child: TextField(
+            controller: _weatherRefreshController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onSubmitted: (v) {
+              final parsed = int.tryParse(v);
+              final mins = (parsed ?? _weatherRefreshMinutes).clamp(1, 60);
+              setState(() { _weatherRefreshMinutes = mins; _weatherRefreshController.text = mins.toString(); });
+              _saveSetting('weather_refresh_minutes', mins);
+            },
+            decoration: const InputDecoration(hintText: '1-60'),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _authChildren() {
+    return [
+      _buildSwitchTile(title: '启用页面锁定', subtitle: '保护敏感页面', value: _authEnabled, onChanged: (v) { setState(() { _authEnabled = v; }); _saveSetting('auth_enabled', v); }),
+      _buildSwitchTile(title: '锁定所有应用', subtitle: '访问应用需要验证', value: _lockApps, onChanged: (v) { setState(() { _lockApps = v; }); _saveSetting('lock_apps', v); }),
+      _buildSwitchTile(title: '锁定设置页', subtitle: '更改设置需要验证', value: _lockSettings, onChanged: (v) { setState(() { _lockSettings = v; }); _saveSetting('lock_settings', v); }),
+      const Divider(),
+      _buildSwitchTile(title: '允许数字密码', subtitle: '使用数字密码解锁', value: _authUsePin, onChanged: (v) { setState(() { _authUsePin = v; }); _saveSetting('auth_use_pin', v); }),
+      _buildSwitchTile(title: '允许人脸/生物识别', subtitle: '使用系统生物识别', value: _authUseBio, onChanged: (v) { setState(() { _authUseBio = v; }); _saveSetting('auth_use_bio', v); }),
+      _buildSwitchTile(title: '允许 NFC 卡片', subtitle: '绑定授权卡片解锁', value: _authUseNfc, onChanged: (v) { setState(() { _authUseNfc = v; }); _saveSetting('auth_use_nfc', v); }),
+      _buildSwitchTile(title: '高安全性', subtitle: '离开敏感页面后立即锁定', value: _authHighSecurity, onChanged: (v) { setState(() { _authHighSecurity = v; }); _saveSetting('auth_high_security', v); }),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('会话时长'),
+        subtitle: const Text('每次解锁后的会话时长(分钟)'),
+        trailing: SizedBox(
+          width: 120.w,
+          child: TextField(
+            controller: _unlockMinutesController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onSubmitted: (v) {
+              final parsed = int.tryParse(v);
+              final mins = (parsed ?? _authUnlockMinutes).clamp(1, 180);
+              setState(() { _authUnlockMinutes = mins; _unlockMinutesController.text = mins.toString(); });
+              _saveSetting('auth_unlock_minutes', mins);
+            },
+            decoration: const InputDecoration(hintText: '1-180'),
+          ),
+        ),
+      ),
+      SizedBox(height: 8.h),
+      Wrap(
+        spacing: 8.w,
+        runSpacing: 8.h,
+        children: [
+          OutlinedButton.icon(onPressed: _setPin, icon: const Icon(Icons.password), label: const Text('设置数字密码')),
+          OutlinedButton.icon(onPressed: _addNfcUid, icon: const Icon(Icons.nfc), label: const Text('添加 NFC 卡')),
+        ],
+      ),
+      SizedBox(height: 8.h),
+      Wrap(
+        spacing: 8.w,
+        runSpacing: 8.h,
+        children: _authNfcUids.map((uid) => Chip(
+          label: Text(uid),
+          onDeleted: () {
+            setState(() { _authNfcUids.remove(uid); });
+            _saveSetting('auth_nfc_uids', _authNfcUids);
+          },
+        )).toList(),
+      ),
+    ];
+  }
+
+  List<Widget> _displayChildren() {
+    return [
+      _buildSwitchTile(title: '深色模式', subtitle: '启用深色主题', value: _darkMode, onChanged: (v) { setState(() { _darkMode = v; }); _saveSetting('dark_mode', v); }),
+      _buildSliderTile(title: '字体大小', subtitle: '调整应用字体大小', value: _fontSize, min: 12.0, max: 24.0, divisions: 12, onChanged: (v) { setState(() { _fontSize = v; }); _saveSetting('font_size', v); }),
+    ];
+  }
+
+  List<Widget> _systemChildren() {
+    final systemVersion = getSystemVersion();
+    return [
+      _buildInfoTile('应用版本', '1.0.0'),
+      _buildInfoTile('系统版本', systemVersion),
+    ];
+  }
+
+  List<Widget> _fakeChildren() {
+    return [
+      _buildSwitchTile(
+        title: '启用测试功能',
+        subtitle: '用于布局与交互验证',
+        value: _fakeEnabled,
+        onChanged: (v) { setState(() { _fakeEnabled = v; }); },
+      ),
+      _buildSliderTile(
+        title: '测试阈值',
+        subtitle: '0-100',
+        value: _fakeThreshold,
+        min: 0.0,
+        max: 100.0,
+        divisions: 20,
+        onChanged: (v) { setState(() { _fakeThreshold = v; }); },
+      ),
+      _buildInfoTile('测试版本', '0.1'),
+    ];
+  }
+
   @override
   void dispose() {
     _unlockMinutesController.dispose();
     AuthService.instance.lockIfHighSecurity();
+    _studentCountController.dispose();
+    _teacherCountController.dispose();
     super.dispose();
   }
 
@@ -699,21 +1040,32 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   }
 
   void _showAboutDialog() {
-    showAboutDialog(
+    showDialog(
       context: context,
-      applicationName: '电子班牌',
-      applicationVersion: '1.0.0',
-      applicationIcon: Icon(
-        Icons.school,
-        size: 48.w,
-        color: Theme.of(context).colorScheme.primary,
-      ),
-      children: [
-        Text(
-          '智能电子班牌应用，为现代化教室提供信息展示和应用管理功能。',
-          style: TextStyle(fontSize: 14.sp),
+      builder: (ctx) => AlertDialog(
+        contentPadding: EdgeInsets.all(16.w),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.school, size: 48.w, color: Theme.of(ctx).colorScheme.primary),
+            SizedBox(height: 8.h),
+            Text('ClassAware', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            SizedBox(height: 4.h),
+            Text('跨平台的电子班牌 APP', style: TextStyle(fontSize: 14.sp), textAlign: TextAlign.center),
+            SizedBox(height: 8.h),
+            Text('版权: © 2025 unDefFtr\n开源协议: Apache License 2.0', style: TextStyle(fontSize: 13.sp, color: Theme.of(ctx).colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
+            SizedBox(height: 8.h),
+            TextButton.icon(
+              onPressed: () => launchUrl(Uri.parse('https://github.com/unDefFtr/ClassAware'), mode: LaunchMode.externalApplication),
+              icon: const Icon(Icons.link),
+              label: const Text('GitHub: github.com/unDefFtr/ClassAware'),
+            ),
+          ],
         ),
-      ],
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('关闭')),
+        ],
+      ),
     );
   }
 

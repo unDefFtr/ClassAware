@@ -28,6 +28,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   DateTime? _sunrise;
   DateTime? _sunset;
   List<DaySun> _sunList = const [];
+  int _studentCount = 45;
+  int _teacherCount = 5;
+  String _className = '高三(1)班';
+  String _headTeacher = '张老师';
+  int _profileTick = 0;
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复初始化定时器
@@ -39,11 +44,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       setState(() {
         _currentTime = DateTime.now();
       });
+      _tickProfileRefresh();
     });
     // 加载本地课表数据
     _scheduleService.loadScheduleFromLocal();
     _loadWeather();
     _setupWeatherTimer();
+    _loadCounts();
+    _loadProfile();
   }
 
   @override
@@ -317,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         padding: EdgeInsets.all(cardPadding), // 使用响应式内边距
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
@@ -335,7 +343,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          '高三(1)班',
+                          _className,
                           style: TextStyle(
                             fontSize: 22.sp, // 减小字体
                             fontWeight: FontWeight.bold,
@@ -348,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          '班主任：张老师',
+                          '班主任：$_headTeacher',
                           style: TextStyle(
                             fontSize: 16.sp, // 减小字体
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -360,16 +368,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 ),
               ],
             ),
-            SizedBox(height: 10.h), // 减少间距，参考server_box
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: _buildInfoItem('学生人数', '45人', Icons.people)),
+                Expanded(child: _buildInfoItem('学生人数', '${_studentCount}人', Icons.people)),
                 SizedBox(width: 8.w),
-                Expanded(child: _buildInfoItem('出勤率', '98%', Icons.check_circle)),
+                Expanded(child: _buildInfoItem('老师人数', '${_teacherCount}人', Icons.person)),
               ],
             ),
-            SizedBox(height: 10.h), // 减少间距，参考server_box
             Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h), // 减小内边距
@@ -871,5 +877,33 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final endMinutes = parseToMinutes(parts[1]);
     if (startMinutes == null || endMinutes == null) return false;
     return currentTimeInMinutes >= startMinutes && currentTimeInMinutes <= endMinutes;
+  }
+  
+  Future<void> _loadCounts() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _studentCount = prefs.getInt('student_count') ?? 45;
+      _teacherCount = prefs.getInt('teacher_count') ?? 5;
+    });
+  }
+
+  Future<void> _loadProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cls = prefs.getString('class_name') ?? '高三(1)班';
+    final tch = prefs.getString('teacher_name') ?? '张老师';
+    if (cls != _className || tch != _headTeacher) {
+      setState(() {
+        _className = cls;
+        _headTeacher = tch;
+      });
+    }
+  }
+
+  void _tickProfileRefresh() {
+    _profileTick = (_profileTick + 1) % 5;
+    if (_profileTick == 0) {
+      _loadProfile();
+      _loadCounts();
+    }
   }
 }
