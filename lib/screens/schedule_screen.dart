@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
 import '../models/schedule_models.dart';
 import '../services/schedule_service.dart';
 
@@ -34,24 +35,55 @@ class _ScheduleScreenState extends State<ScheduleScreen> with AutomaticKeepAlive
 
   Future<void> _importCSESFile() async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['yml', 'yaml'],
-        dialogTitle: '选择CSES课表文件',
-      );
+      FilePickerResult? result;
+      try {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['yaml', 'yml'],
+          dialogTitle: '选择CSES课表文件',
+          withData: true,
+        );
+      } on PlatformException catch (e) {
+        final msg = e.message?.toLowerCase() ?? '';
+        if (msg.contains('unsupported')) {
+          result = await FilePicker.platform.pickFiles(
+            type: FileType.any,
+            dialogTitle: '选择CSES课表文件',
+            withData: true,
+          );
+        } else {
+          rethrow;
+        }
+      }
 
-      if (result != null && result.files.single.bytes != null) {
+      if (result != null) {
+        final file = result.files.single;
+        final name = file.name.toLowerCase();
+        if (!name.endsWith('.yaml') && !name.endsWith('.yml')) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('请选择 .yaml 或 .yml 文件')),
+            );
+          }
+          return;
+        }
+
+        if (file.bytes == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('无法读取文件内容')),
+            );
+          }
+          return;
+        }
+
         setState(() => _isLoading = true);
-        
-        // Web端使用bytes，正确处理UTF-8编码
-        final fileBytes = result.files.single.bytes!;
-        final content = utf8.decode(fileBytes);
+        final content = utf8.decode(file.bytes!);
         final schedule = await _scheduleService.parseCSESFile(content);
-        
+
         if (schedule != null) {
           await _scheduleService.importSchedule(schedule);
           setState(() => _isLoading = false);
-          
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('课表导入成功！')),

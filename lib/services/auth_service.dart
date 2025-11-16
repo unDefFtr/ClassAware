@@ -140,6 +140,8 @@ class AuthService {
     if (!context.mounted) return false;
     String pin = '';
     String err = '';
+    int filledCount = 0;
+    bool animatingError = false;
     const int pinLen = 6;
     final ok = await showDialog<bool>(
       context: context,
@@ -156,18 +158,46 @@ class AuthService {
                   if (match) {
                     Navigator.of(ctx).pop(true);
                   } else {
-                    setState(() { err = '密码错误'; pin = ''; });
+                    Future<void> runErrorAnimation() async {
+                      animatingError = true;
+                      setState(() { err = '密码错误'; });
+                      for (int i = filledCount; i > 0; i--) {
+                        await Future.delayed(const Duration(milliseconds: 80));
+                        setState(() { filledCount = i - 1; });
+                      }
+                      setState(() { pin = ''; });
+                      animatingError = false;
+                    }
+                    runErrorAnimation();
                   }
                 }
               }
-              Widget dot(bool filled) {
-                return Container(
+              Widget dot(int index) {
+                final filled = index < filledCount;
+                return SizedBox(
                   width: 14,
                   height: 14,
-                  decoration: BoxDecoration(
-                    color: filled ? Theme.of(ctx).colorScheme.onSurface : Colors.transparent,
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(color: Theme.of(ctx).colorScheme.outlineVariant),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(7),
+                          border: Border.all(color: Theme.of(ctx).colorScheme.outlineVariant),
+                        ),
+                      ),
+                      AnimatedOpacity(
+                        opacity: filled ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(ctx).colorScheme.onSurface,
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               }
@@ -184,8 +214,9 @@ class AuthService {
                       onTapUp: (_) {
                         setKeyState(() { pressed = false; });
                         final action = onTap ?? () {
+                          if (animatingError) return;
                           if (pin.length >= 12) return;
-                          setState(() { pin += label; err = ''; });
+                          setState(() { pin += label; err = ''; filledCount = pin.length; });
                           submitIfReady();
                         };
                         action();
@@ -225,8 +256,9 @@ class AuthService {
                       onTapCancel: () { setKeyState(() { pressed = false; }); },
                       onTapUp: (_) {
                         setKeyState(() { pressed = false; });
+                        if (animatingError) return;
                         if (pin.isEmpty) return;
-                        setState(() { pin = pin.substring(0, pin.length - 1); err = ''; });
+                        setState(() { pin = pin.substring(0, pin.length - 1); err = ''; filledCount = pin.length; });
                       },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
@@ -283,7 +315,7 @@ class AuthService {
                               mainAxisSize: MainAxisSize.min,
                               children: List.generate(pinLen, (i) => Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                                child: dot(i < pin.length),
+                                child: dot(i),
                               )),
                             ),
                           ),
