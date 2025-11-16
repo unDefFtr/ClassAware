@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import '../services/auth_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,6 +21,15 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   double _fontSize = 16.0;
   String _className = '高三(1)班';
   String _teacherName = '张老师';
+  bool _authEnabled = false;
+  bool _lockApps = true;
+  bool _lockSettings = true;
+  bool _authUsePin = true;
+  bool _authUseBio = false;
+  bool _authUseNfc = false;
+  List<String> _authNfcUids = [];
+  int _authUnlockMinutes = 10;
+  final TextEditingController _unlockMinutesController = TextEditingController(text: '10');
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复加载设置
@@ -37,6 +50,15 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       _fontSize = prefs.getDouble('font_size') ?? 16.0;
       _className = prefs.getString('class_name') ?? '高三(1)班';
       _teacherName = prefs.getString('teacher_name') ?? '张老师';
+      _authEnabled = prefs.getBool('auth_enabled') ?? false;
+      _lockApps = prefs.getBool('lock_apps') ?? true;
+      _lockSettings = prefs.getBool('lock_settings') ?? true;
+      _authUsePin = prefs.getBool('auth_use_pin') ?? true;
+      _authUseBio = prefs.getBool('auth_use_bio') ?? false;
+      _authUseNfc = prefs.getBool('auth_use_nfc') ?? false;
+      _authNfcUids = prefs.getStringList('auth_nfc_uids') ?? [];
+      _authUnlockMinutes = prefs.getInt('auth_unlock_minutes') ?? 10;
+      _unlockMinutesController.text = _authUnlockMinutes.toString();
     });
   }
 
@@ -48,6 +70,10 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       await prefs.setDouble(key, value);
     } else if (value is String) {
       await prefs.setString(key, value);
+    } else if (value is List<String>) {
+      await prefs.setStringList(key, value);
+    } else if (value is int) {
+      await prefs.setInt(key, value);
     }
   }
 
@@ -89,6 +115,119 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
             ),
           ),
           
+          SizedBox(height: 16.h),
+          RepaintBoundary(
+            child: _buildSectionCard(
+              title: '身份验证',
+              icon: Icons.verified_user,
+              children: [
+                _buildSwitchTile(
+                  title: '启用页面锁定',
+                  subtitle: '保护敏感页面',
+                  value: _authEnabled,
+                  onChanged: (v) {
+                    setState(() { _authEnabled = v; });
+                    _saveSetting('auth_enabled', v);
+                  },
+                ),
+                _buildSwitchTile(
+                  title: '锁定所有应用',
+                  subtitle: '访问应用需要验证',
+                  value: _lockApps,
+                  onChanged: (v) {
+                    setState(() { _lockApps = v; });
+                    _saveSetting('lock_apps', v);
+                  },
+                ),
+                _buildSwitchTile(
+                  title: '锁定设置页',
+                  subtitle: '更改设置需要验证',
+                  value: _lockSettings,
+                  onChanged: (v) {
+                    setState(() { _lockSettings = v; });
+                    _saveSetting('lock_settings', v);
+                  },
+                ),
+                const Divider(),
+                _buildSwitchTile(
+                  title: '允许数字密码',
+                  subtitle: '使用数字密码解锁',
+                  value: _authUsePin,
+                  onChanged: (v) {
+                    setState(() { _authUsePin = v; });
+                    _saveSetting('auth_use_pin', v);
+                  },
+                ),
+                _buildSwitchTile(
+                  title: '允许人脸/生物识别',
+                  subtitle: '使用系统生物识别',
+                  value: _authUseBio,
+                  onChanged: (v) {
+                    setState(() { _authUseBio = v; });
+                    _saveSetting('auth_use_bio', v);
+                  },
+                ),
+              _buildSwitchTile(
+                title: '允许 NFC 卡片',
+                subtitle: '绑定授权卡片解锁',
+                value: _authUseNfc,
+                onChanged: (v) {
+                  setState(() { _authUseNfc = v; });
+                  _saveSetting('auth_use_nfc', v);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('会话时长'),
+                // subtitle: Text('当前 $_authUnlockMinutes 分钟'),
+                subtitle: Text('每次解锁后的会话时长(分钟)'),
+                trailing: SizedBox(
+                  width: 120.w,
+                  child: TextField(
+                    controller: _unlockMinutesController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onSubmitted: (v) {
+                      final parsed = int.tryParse(v);
+                      final mins = (parsed ?? _authUnlockMinutes).clamp(1, 180);
+                      setState(() { _authUnlockMinutes = mins; _unlockMinutesController.text = mins.toString(); });
+                      _saveSetting('auth_unlock_minutes', mins);
+                    },
+                    decoration: const InputDecoration(hintText: '1-180'),
+                  ),
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _setPin,
+                      icon: const Icon(Icons.password),
+                      label: const Text('设置数字密码'),
+                    ),
+                    SizedBox(width: 8.w),
+                    OutlinedButton.icon(
+                      onPressed: _addNfcUid,
+                      icon: const Icon(Icons.nfc),
+                      label: const Text('添加 NFC 卡'),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8.h),
+                Wrap(
+                  spacing: 8.w,
+                  runSpacing: 8.h,
+                  children: _authNfcUids.map((uid) => Chip(
+                    label: Text(uid),
+                    onDeleted: () {
+                      setState(() { _authNfcUids.remove(uid); });
+                      _saveSetting('auth_nfc_uids', _authNfcUids);
+                    },
+                  )).toList(),
+                ),
+              ],
+            ),
+          ),
           SizedBox(height: 16.h),
           
           // 显示设置
@@ -197,6 +336,12 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _unlockMinutesController.dispose();
+    super.dispose();
   }
 
   Widget _buildSectionCard({
@@ -449,4 +594,80 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       ],
     );
   }
+
+  Future<void> _setPin() async {
+    final a = TextEditingController();
+    final b = TextEditingController();
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('设置数字密码'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(obscureText: true, keyboardType: TextInputType.number, controller: a, decoration: const InputDecoration(labelText: '新密码')),
+            TextField(obscureText: true, keyboardType: TextInputType.number, controller: b, decoration: const InputDecoration(labelText: '确认密码')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final s1 = a.text.trim();
+      final s2 = b.text.trim();
+      if (s1.isNotEmpty && s1 == s2) {
+        final hash = sha256.convert(utf8.encode(s1)).toString();
+        await _saveSetting('auth_pin_hash', hash);
+        setState(() { _authEnabled = true; });
+        await _saveSetting('auth_enabled', true);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('密码已更新')));
+        }
+      }
+    }
+  }
+
+  Future<void> _addNfcUid() async {
+    final uid = await AuthService.instance.readNfcUidOnce();
+    if (uid != null && uid.isNotEmpty) {
+      setState(() { _authNfcUids = {..._authNfcUids, uid}.toList(); });
+      await _saveSetting('auth_nfc_uids', _authNfcUids);
+      setState(() { _authEnabled = true; });
+      await _saveSetting('auth_enabled', true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已添加卡片')));
+      }
+      return;
+    }
+    final controller = TextEditingController();
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('输入卡 UID'),
+        content: TextField(controller: controller),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('添加')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final s = controller.text.trim();
+      if (s.isNotEmpty) {
+        setState(() { _authNfcUids = {..._authNfcUids, s}.toList(); });
+        await _saveSetting('auth_nfc_uids', _authNfcUids);
+        setState(() { _authEnabled = true; });
+        await _saveSetting('auth_enabled', true);
+      }
+    }
+  }
+
+  
+
+  
 }

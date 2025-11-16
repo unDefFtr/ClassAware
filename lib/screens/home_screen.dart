@@ -520,7 +520,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                           boxShadow: isCurrentTime 
                               ? [
                                   BoxShadow(
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                                     blurRadius: 8,
                                     offset: Offset(0, 2),
                                   ),
@@ -578,9 +578,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                                       fontSize: 14.sp,
                                       fontWeight: FontWeight.w400,
                                       color: isCurrentTime 
-                                          ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
+                                          ? Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)
                                           : Theme.of(context).colorScheme.onSurfaceVariant,
-                                    ),
+                                      ),
                                   ),
                                 ],
                               ),

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 // CSES 标准数据模型
 class ScheduleData {
   final int version;

@@ -162,7 +162,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with AutomaticKeepAlive
                 icon: const Icon(Icons.link),
                 label: const Text('连接ClassIsland'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                   foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -424,7 +424,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with AutomaticKeepAlive
               Container(
                 padding: EdgeInsets.all(12.w),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8.r),
                 ),
                 child: Row(

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/auth_service.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:flutter/services.dart';
-import 'dart:typed_data';
 import 'dart:convert';
 
 class AppsScreen extends StatefulWidget {
@@ -130,7 +130,6 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
   Widget build(BuildContext context) {
     super.build(context); // 必须调用，用于保持页面状态
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final screenWidth = MediaQuery.of(context).size.width;
     
     return Scaffold(
       body: Column(
@@ -147,10 +146,10 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                   width: isLandscape ? 140.w : 120.w, // 横屏时增加宽度
                   padding: EdgeInsets.all(16.w),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                     border: Border(
                       right: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
@@ -179,7 +178,7 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
         onChanged: (value) {
           _searchNotifier.value = value;
         },
-        padding: MaterialStateProperty.all(
+        padding: WidgetStateProperty.all(
           EdgeInsets.symmetric(horizontal: 16.w),
         ),
       ),
@@ -307,6 +306,42 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
   }
 
   Widget _buildAppsList() {
+    return FutureBuilder<bool>(
+      future: _shouldShowContent(),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.data != true) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.lock_outline, size: 48.w, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                SizedBox(height: 12.h),
+                FilledButton(
+                  onPressed: () async {
+                    final ok = await AuthService.instance.ensureAuthenticated(context, reason: '访问所有应用');
+                    if (ok) setState(() {});
+                  },
+                  child: const Text('解锁'),
+                ),
+              ],
+            ),
+          );
+        }
+        return _buildAppsGrid();
+      },
+    );
+  }
+
+  Future<bool> _shouldShowContent() async {
+    final needLock = await AuthService.instance.shouldLockApps();
+    if (!needLock) return true;
+    return AuthService.instance.isAuthenticated;
+  }
+
+  Widget _buildAppsGrid() {
     
     if (_isLoading) {
       return const Center(

@@ -58,6 +58,15 @@ dependencies:
   
   # For file picking
   file_picker: ^8.0.0+1
+  
+  # For biometrics authentication
+  local_auth: ^2.1.7
+  
+  # For NFC on Android/iOS
+  nfc_manager: ^4.1.1
+  
+  # For hashing PIN securely
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
