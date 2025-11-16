@@ -229,7 +229,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             ],
           ),
           Positioned(
-            top: 12,
+            bottom: 12,
             right: 12,
             child: ListenableBuilder(
               listenable: AuthService.instance.authActive,
