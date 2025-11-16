@@ -42,7 +42,8 @@ class WeatherData {
   final List<DailyWeather> daily;
   final DateTime? sunrise;
   final DateTime? sunset;
-  WeatherData({this.temperature, this.description, this.currentCode, required this.daily, this.sunrise, this.sunset});
+  final List<DaySun> sunList;
+  WeatherData({this.temperature, this.description, this.currentCode, required this.daily, this.sunrise, this.sunset, required this.sunList});
   factory WeatherData.fromJson(Map<String, dynamic> j) {
     String? temp;
     String? desc;
@@ -63,18 +64,31 @@ class WeatherData {
     final wvals = weathers?['value'] as List<dynamic>?;
     DateTime? sr;
     DateTime? ss;
+    final suns = <DaySun>[];
     final srs = fd?['sunRiseSet'] as Map<String, dynamic>?;
     final srVals = srs?['value'] as List<dynamic>?;
     if (srVals != null && srVals.isNotEmpty) {
-      final today = srVals.first as Map<String, dynamic>;
-      final from = today['from']?.toString();
-      final to = today['to']?.toString();
-      if (from != null) {
-        try { sr = DateTime.parse(from); } catch (_) {}
+      for (final v in srVals) {
+        if (v is Map) {
+          final f = v['from']?.toString();
+          final t = v['to']?.toString();
+          if (f != null && t != null) {
+            try {
+              final df = DateTime.parse(f).toLocal();
+              final dt = DateTime.parse(t).toLocal();
+              suns.add(DaySun(from: df, to: dt));
+            } catch (_) {}
+          }
+        }
       }
-      if (to != null) {
-        try { ss = DateTime.parse(to); } catch (_) {}
-      }
+      // 找到与今天匹配的时间段作为当前sunrise/sunset
+      final today = DateTime.now();
+      final match = suns.firstWhere(
+        (e) => e.from.year == today.year && e.from.month == today.month && e.from.day == today.day,
+        orElse: () => suns.isNotEmpty ? suns.first : DaySun(from: DateTime(today.year, today.month, today.day, 6), to: DateTime(today.year, today.month, today.day, 18)),
+      );
+      sr = match.from;
+      ss = match.to;
     }
     final now = DateTime.now();
     if (vals != null) {
@@ -93,8 +107,14 @@ class WeatherData {
         if (dailyList.length >= 7) break;
       }
     }
-    return WeatherData(temperature: temp, description: desc, currentCode: code, daily: dailyList, sunrise: sr, sunset: ss);
+    return WeatherData(temperature: temp, description: desc, currentCode: code, daily: dailyList, sunrise: sr, sunset: ss, sunList: suns);
   }
+}
+
+class DaySun {
+  final DateTime from;
+  final DateTime to;
+  DaySun({required this.from, required this.to});
 }
 
 class DailyWeather {

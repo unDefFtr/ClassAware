@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/weather_service.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../services/schedule_service.dart';
 
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   String _currentIconPath = 'assets/weather-icons/clear_day.svg';
   DateTime? _sunrise;
   DateTime? _sunset;
+  List<DaySun> _sunList = const [];
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复初始化定时器
@@ -668,6 +670,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       _currentIconPath = _iconAssetForCode(data.currentCode);
       _sunrise = data.sunrise;
       _sunset = data.sunset;
+      _sunList = data.sunList;
       if (list.isNotEmpty) {
         _weekWeather
           ..clear()
@@ -679,11 +682,29 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   String _iconAssetForCode(int? code) {
     final now = DateTime.now();
     bool isDay;
-    if (_sunrise != null && _sunset != null) {
-      isDay = now.isAfter(_sunrise!) && now.isBefore(_sunset!);
+    DaySun? todayRange;
+    if (_sunList.isNotEmpty) {
+      todayRange = _sunList.firstWhere(
+        (e) => e.from.year == now.year && e.from.month == now.month && e.from.day == now.day,
+        orElse: () => _sunList.first,
+      );
+    }
+    if (todayRange != null) {
+      // 日间判定：在 [from, to) 区间内
+      isDay = (now.isAfter(todayRange.from) || now.isAtSameMomentAs(todayRange.from)) && now.isBefore(todayRange.to);
+    } else if (_sunrise != null && _sunset != null) {
+      isDay = (now.isAfter(_sunrise!) || now.isAtSameMomentAs(_sunrise!)) && now.isBefore(_sunset!);
     } else {
       final h = now.hour;
       isDay = h >= 6 && h < 18;
+    }
+    if (kDebugMode) {
+      final rangeStr = todayRange != null
+          ? '${todayRange.from.toLocal()} -> ${todayRange.to.toLocal()}'
+          : (_sunrise != null && _sunset != null
+              ? '${_sunrise!.toLocal()} -> ${_sunset!.toLocal()}'
+              : 'fallback 06:00-18:00');
+      debugPrint('[WeatherIcon] now=${now.toLocal()} range=$rangeStr isDay=$isDay code=$code');
     }
     String choose(String day, String night) => isDay ? day : night;
     if (code == null) return 'assets/weather-icons/cloudy_day_night.svg';
