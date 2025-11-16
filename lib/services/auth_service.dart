@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -287,77 +288,121 @@ class AuthService {
                   final gridH = s * 4 + space * 3;
                   final gridW = s * 3 + space * 2;
                   final panelW = (gridW + 48).clamp(320.0, screenW * 0.9);
-                  return ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: maxPanelH, maxWidth: panelW),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(height: 8),
-                          Text(
-                            err.isNotEmpty ? '密码错误' : '输入密码',
-                            style: TextStyle(
-                              color: err.isNotEmpty
-                                  ? Theme.of(ctx).colorScheme.error
-                                  : Theme.of(ctx).colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Theme.of(ctx).colorScheme.outlineVariant, width: 1.2),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: List.generate(pinLen, (i) => Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                child: dot(i),
-                              )),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Center(
-                            child: SizedBox(
-                              height: gridH,
-                              width: gridW,
-                              child: GridView.count(
-                                crossAxisCount: 3,
-                                mainAxisSpacing: space,
-                                crossAxisSpacing: space,
-                                physics: const NeverScrollableScrollPhysics(),
-                                children: [
-                                  key('1', s), key('2', s), key('3', s),
-                                  key('4', s), key('5', s), key('6', s),
-                                  key('7', s), key('8', s), key('9', s),
-                                  const SizedBox.shrink(),
-                                  key('0', s),
-                                  backspace(s),
-                                ],
+                  return Focus(
+                    autofocus: true,
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent) {
+                        final key = event.logicalKey;
+                        if (key == LogicalKeyboardKey.backspace) {
+                          if (animatingError) return KeyEventResult.handled;
+                          if (pin.isEmpty) return KeyEventResult.handled;
+                          setState(() {
+                            pin = pin.substring(0, pin.length - 1);
+                            err = '';
+                            filledCount = pin.length;
+                          });
+                          return KeyEventResult.handled;
+                        }
+                        if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
+                          submitIfReady();
+                          return KeyEventResult.handled;
+                        }
+                        final label = key.keyLabel;
+                        if (label.isNotEmpty && RegExp(r'^[0-9]$').hasMatch(label)) {
+                          if (animatingError) return KeyEventResult.handled;
+                          if (pin.length >= pinLen) return KeyEventResult.handled;
+                          setState(() {
+                            pin += label;
+                            err = '';
+                            filledCount = pin.length;
+                          });
+                          submitIfReady();
+                          return KeyEventResult.handled;
+                        }
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: maxPanelH,
+                        maxWidth: panelW,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(height: 8),
+                            Text(
+                              err.isNotEmpty ? '密码错误' : '输入密码',
+                              style: TextStyle(
+                                color: err.isNotEmpty
+                                    ? Theme.of(ctx).colorScheme.error
+                                    : Theme.of(ctx).colorScheme.onSurface,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(false),
-                                child: const Text('取消'),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Theme.of(ctx).colorScheme.outlineVariant,
+                                  width: 1.2,
+                                ),
                               ),
-                              FilledButton(
-                                onPressed: () {
-                                  final hash = sha256.convert(utf8.encode(pin)).toString();
-                                  Navigator.of(ctx).pop(hash == hashSaved);
-                                },
-                                child: const Text('确定'),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(
+                                  pinLen,
+                                  (i) => Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: dot(i),
+                                  ),
+                                ),
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                            const SizedBox(height: 16),
+                            Center(
+                              child: SizedBox(
+                                height: gridH,
+                                width: gridW,
+                                child: GridView.count(
+                                  crossAxisCount: 3,
+                                  mainAxisSpacing: space,
+                                  crossAxisSpacing: space,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  children: [
+                                    key('1', s), key('2', s), key('3', s),
+                                    key('4', s), key('5', s), key('6', s),
+                                    key('7', s), key('8', s), key('9', s),
+                                    const SizedBox.shrink(),
+                                    key('0', s),
+                                    backspace(s),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: const Text('取消'),
+                                ),
+                                FilledButton(
+                                  onPressed: () {
+                                    final hash = sha256.convert(utf8.encode(pin)).toString();
+                                    Navigator.of(ctx).pop(hash == hashSaved);
+                                  },
+                                  child: const Text('确定'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );

@@ -563,13 +563,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with AutomaticKeepAlive
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '周课表',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        SizedBox(height: 16.h),
         Card(
           elevation: 0,
           shape: RoundedRectangleBorder(

@@ -96,6 +96,11 @@ class AppFilter(private val context: Context) {
         val flattenedName = componentName.flattenToString()
         val packageName = componentName.packageName
         
+        // 优先允许系统设置应用显示
+        if (packageName == "com.android.settings") {
+            return true
+        }
+        
         // 第一层过滤：检查组件名是否在过滤列表中
         if (FILTERED_COMPONENTS.contains(flattenedName)) {
             return false
@@ -131,10 +136,7 @@ class AppFilter(private val context: Context) {
             return true
         }
         
-        // 过滤设置相关的内部Activity
-        if (className.contains("Settings") && packageName.startsWith("com.android")) {
-            return true
-        }
+        // 不再全局过滤包含 Settings 的系统 Activity，避免误过滤系统“设置”
         
         return false
     }
