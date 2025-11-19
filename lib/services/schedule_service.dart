@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/logger.dart';
 import 'package:yaml/yaml.dart';
 import '../models/schedule_models.dart';
 
@@ -24,8 +25,8 @@ class ScheduleService {
         final Map<String, dynamic> data = jsonDecode(scheduleJson);
         _currentSchedule = ScheduleData.fromJson(data);
       }
-    } catch (e) {
-      print('加载本地课表失败: $e');
+    } catch (e, st) {
+      Log.e('加载本地课表失败', tag: 'Schedule', error: e, stack: st);
     }
   }
 
@@ -37,8 +38,8 @@ class ScheduleService {
         final scheduleJson = jsonEncode(_currentSchedule!.toJson());
         await prefs.setString(_scheduleKey, scheduleJson);
       }
-    } catch (e) {
-      print('保存课表失败: $e');
+    } catch (e, st) {
+      Log.e('保存课表失败', tag: 'Schedule', error: e, stack: st);
     }
   }
 
@@ -46,8 +47,8 @@ class ScheduleService {
   Future<ScheduleData?> parseCSESFile(String content) async {
     try {
       return parseCSESContent(content);
-    } catch (e) {
-      print('解析CSES文件失败: $e');
+    } catch (e, st) {
+      Log.e('解析CSES文件失败', tag: 'Schedule', error: e, stack: st);
       return null;
     }
   }

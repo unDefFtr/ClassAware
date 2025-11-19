@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/system_info.dart';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/city_database_service.dart';
 import 'dart:convert';
@@ -770,11 +771,15 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   }
 
   List<Widget> _systemChildren() {
-    final systemVersion = getSystemVersion();
-    return [
+    final showSystem = kIsWeb || defaultTargetPlatform == TargetPlatform.android;
+    final list = <Widget>[
       _buildInfoTile('应用版本', '1.0.0'),
-      _buildInfoTile('系统版本', systemVersion),
     ];
+    if (showSystem) {
+      final systemVersion = getSystemVersion();
+      list.add(_buildInfoTile('系统版本', systemVersion));
+    }
+    return list;
   }
 
   List<Widget> _fakeChildren() {

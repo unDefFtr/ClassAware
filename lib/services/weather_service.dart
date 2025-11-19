@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import '../utils/logger.dart';
 import 'package:intl/intl.dart';
 
 class WeatherService {
@@ -20,14 +21,20 @@ class WeatherService {
     });
     final client = HttpClient();
     try {
+      Log.d('请求天气数据 key=$key days=$days', tag: 'Weather');
       final req = await client.getUrl(uri);
       req.headers.set('User-Agent', 'ClassAware');
       final res = await req.close().timeout(const Duration(seconds: 10));
-      if (res.statusCode != 200) return null;
+      if (res.statusCode != 200) {
+        Log.w('天气接口返回非200: ${res.statusCode}', tag: 'Weather');
+        return null;
+      }
       final body = await res.transform(utf8.decoder).join();
+      Log.t('天气响应长度=${body.length}', tag: 'Weather');
       final jsonData = json.decode(body) as Map<String, dynamic>;
       return WeatherData.fromJson(jsonData);
-    } catch (_) {
+    } catch (e, st) {
+      Log.e('天气请求失败', tag: 'Weather', error: e, stack: st);
       return null;
     } finally {
       client.close(force: true);

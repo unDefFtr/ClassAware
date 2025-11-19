@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../utils/logger.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/weather_service.dart';
@@ -710,7 +711,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           : (_sunrise != null && _sunset != null
               ? '${_sunrise!.toLocal()} -> ${_sunset!.toLocal()}'
               : 'fallback 06:00-18:00');
-      debugPrint('[WeatherIcon] now=${now.toLocal()} range=$rangeStr isDay=$isDay code=$code');
+      Log.d('now=${now.toLocal()} range=$rangeStr isDay=$isDay code=$code', tag: 'WeatherIcon');
     }
     String choose(String day, String night) => isDay ? day : night;
     if (code == null) return 'assets/weather-icons/cloudy_day_night.svg';

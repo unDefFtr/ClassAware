@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
+import '../utils/logger.dart';
 
 class AppsScreen extends StatefulWidget {
   const AppsScreen({super.key});
@@ -79,10 +80,9 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
           _isLoading = false;
         });
       }
-      
-      print('成功加载 ${_allApps.length} 个可启动应用');
+      Log.i('成功加载 ${_allApps.length} 个可启动应用', tag: 'Apps');
     } catch (e) {
-      print('加载应用失败: $e');
+      Log.e('加载应用失败', tag: 'Apps', error: e);
       if (mounted) {
         setState(() {
           _isLoading = false;
