@@ -1,5 +1,9 @@
 import 'dart:io';
 
 String getSystemVersion() {
-  return Platform.operatingSystemVersion;
+  try {
+    return Platform.operatingSystemVersion;
+  } catch (_) {
+    return '未知';
+  }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/system_info.dart';
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/city_database_service.dart';
 import 'dart:convert';
@@ -577,11 +578,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
             child: _buildSectionCard(
               title: '系统信息',
               icon: Icons.info,
-              children: [
-                _buildInfoTile('应用版本', '1.0.0'),
-                _buildInfoTile('系统版本', 'Android 12'),
-                _buildInfoTile('设备型号', 'Class Board Pro'),
-              ],
+              children: _systemChildren(),
             ),
           ),
           
@@ -776,7 +773,16 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       _buildInfoTile('应用版本', '1.0.0'),
     ];
     if (showSystem) {
-      final systemVersion = getSystemVersion();
+      String systemVersion = '';
+      try {
+        systemVersion = getSystemVersion();
+      } catch (e, st) {
+        Log.w('获取系统版本失败', tag: 'Settings', error: e, stack: st);
+      }
+      if (systemVersion.isEmpty) {
+        systemVersion = '未知';
+      }
+      Log.i('系统版本: $systemVersion', tag: 'Settings');
       list.add(_buildInfoTile('系统版本', systemVersion));
     }
     return list;
@@ -946,20 +952,35 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   }
 
   Widget _buildInfoTile(String title, String value) {
-    return RepaintBoundary( // 添加重绘边界优化
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(
-          title,
-          style: TextStyle(fontSize: 16.sp),
-        ),
-        trailing: Text(
-          value,
-          style: TextStyle(
-            fontSize: 16.sp,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
+    return RepaintBoundary(
+      child: LayoutBuilder(
+        builder: (ctx, constraints) {
+          double trailingW = constraints.maxWidth.isFinite ? constraints.maxWidth * 0.4 : 240.w;
+          if (trailingW < 120.w) trailingW = 120.w;
+          if (trailingW > 320.w) trailingW = 320.w;
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              title,
+              style: TextStyle(fontSize: 16.sp),
+            ),
+            trailing: SizedBox(
+              width: trailingW,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
