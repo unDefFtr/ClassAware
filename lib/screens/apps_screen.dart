@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import '../utils/logger.dart';
 
@@ -25,6 +26,8 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
   
   // MethodChannel for native Android communication
   static const platform = MethodChannel('com.example.classaware/launcher');
+  final Map<String, Uint8List?> _iconCache = {};
+  final Map<String, Future<Uint8List?>> _iconFutures = {};
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复加载应用列表
@@ -68,8 +71,12 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
       
       for (var appData in launchableApps) {
         final Map<String, dynamic> app = Map<String, dynamic>.from(appData);
-        
-        // 原生Android代码已经包含图标数据
+        final iconStr = (app['icon'] ?? '').toString();
+        if (iconStr.isNotEmpty) {
+          try {
+            app['iconBytes'] = base64Decode(iconStr);
+          } catch (_) {}
+        }
         apps.add(app);
       }
 
@@ -238,9 +245,12 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
         SizedBox(height: 12.h),
         Expanded(
           child: ListView.builder(
+            cacheExtent: 200,
             itemCount: quickApps.length,
             itemBuilder: (context, index) {
               final app = quickApps[index];
+              final dpr = MediaQuery.of(context).devicePixelRatio;
+              final cacheSize = (48.w * dpr).round();
               return RepaintBoundary( // 添加重绘边界优化
                 child: GestureDetector(
                   onTap: () => _launchApp(app),
@@ -257,27 +267,7 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12.r),
-                            child: app['icon'] != null && app['icon'].toString().isNotEmpty
-                                ? Image.memory(
-                                    base64Decode(app['icon']),
-                                    width: 48.w,
-                                    height: 48.w,
-                                    fit: BoxFit.contain,
-                                    cacheWidth: (48.w * MediaQuery.of(context).devicePixelRatio).round(),
-                                    cacheHeight: (48.w * MediaQuery.of(context).devicePixelRatio).round(),
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Icon(
-                                        Icons.apps,
-                                        size: 24.sp,
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                      );
-                                    },
-                                  )
-                                : Icon(
-                                    Icons.apps,
-                                    size: 24.sp,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
+                            child: _buildAppIcon(app['packageName'] as String, 48.w, cacheSize, fallbackColor: Theme.of(context).colorScheme.onSurfaceVariant, fallbackSize: 24.sp),
                           ),
                         ),
                         SizedBox(height: 4.h),
@@ -402,9 +392,12 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                 final textHeight = fontSize * 1.2 * 2;
                 final tileHeight = iconSize + 4.h + textHeight + 12.0;
                 final aspect = (minTile / tileHeight).clamp(0.65, 1.0);
+                final dpr = MediaQuery.of(context).devicePixelRatio;
+                final cacheSize = (iconSize * dpr).round();
                 return GridView.builder(
                   physics: const BouncingScrollPhysics(),
                   shrinkWrap: true,
+                  cacheExtent: tileHeight * 2,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: cols,
                     childAspectRatio: aspect,
@@ -434,27 +427,7 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(12.r),
-                                    child: app['icon'] != null && app['icon'].toString().isNotEmpty
-                                        ? Image.memory(
-                                            base64Decode(app['icon']),
-                                            width: 48.w,
-                                            height: 48.w,
-                                            fit: BoxFit.contain,
-                                            cacheWidth: (48.w * MediaQuery.of(context).devicePixelRatio).round(),
-                                            cacheHeight: (48.w * MediaQuery.of(context).devicePixelRatio).round(),
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Icon(
-                                                Icons.apps,
-                                                color: Theme.of(context).colorScheme.primary,
-                                                size: 28.w,
-                                              );
-                                            },
-                                          )
-                                        : Icon(
-                                            Icons.apps,
-                                            color: Theme.of(context).colorScheme.primary,
-                                            size: 28.w,
-                                          ),
+                                    child: _buildAppIcon(app['packageName'] as String, 48.w, cacheSize, fallbackColor: Theme.of(context).colorScheme.primary, fallbackSize: 28.w),
                                   ),
                                 ),
                                 SizedBox(height: 4.h),
@@ -497,6 +470,60 @@ class _AppsScreenState extends State<AppsScreen> with AutomaticKeepAliveClientMi
     } catch (e) {
       // 如果检查失败，返回false以排除该应用
       return false;
+    }
+  }
+
+  Widget _buildAppIcon(String packageName, double size, int cacheSize, {required Color fallbackColor, required double fallbackSize}) {
+    final cached = _iconCache[packageName];
+    if (cached != null && cached.isNotEmpty) {
+      return Image.memory(
+        cached,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+        filterQuality: FilterQuality.none,
+        gaplessPlayback: true,
+      );
+    }
+    final future = _iconFutures[packageName] ?? _requestIcon(packageName);
+    _iconFutures[packageName] = future;
+    return FutureBuilder<Uint8List?>(
+      future: future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.done && snap.data != null && snap.data!.isNotEmpty) {
+          return Image.memory(
+            snap.data!,
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+            cacheWidth: cacheSize,
+            cacheHeight: cacheSize,
+            filterQuality: FilterQuality.none,
+            gaplessPlayback: true,
+          );
+        }
+        return Icon(
+          Icons.apps,
+          color: fallbackColor,
+          size: fallbackSize,
+        );
+      },
+    );
+  }
+
+  Future<Uint8List?> _requestIcon(String packageName) async {
+    try {
+      final bytes = await platform.invokeMethod<Uint8List>('getAppIcon', {
+        'packageName': packageName,
+      });
+      if (bytes == null || bytes.isEmpty) return null;
+      _iconCache[packageName] = bytes;
+      return bytes;
+    } catch (_) {
+      _iconCache[packageName] = null;
+      return null;
     }
   }
 }

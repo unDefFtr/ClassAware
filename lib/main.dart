@@ -7,6 +7,8 @@ import 'screens/schedule_screen.dart';
 import 'screens/settings_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/auth_service.dart';
+import 'package:flutter_nfc_kit/flutter_nfc_kit.dart';
+import 'dart:async';
 
 // 页面缓存包装器，防止页面重复构建
 class AutomaticKeepAliveWrapper extends StatefulWidget {
@@ -93,6 +95,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   final _selectIndex = ValueNotifier(0);
   bool _switchingPage = false;
   late final VoidCallback _authListener;
+  StreamSubscription? _nfcSub;
   
   final List<Widget> _screens = const [
     HomeScreen(),
@@ -109,6 +112,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     _pageController = PageController(initialPage: _selectIndex.value);
     _authListener = _onAuthActiveChanged;
     AuthService.instance.authActive.addListener(_authListener);
+    _setupNfcEvents();
   }
 
   @override
@@ -116,6 +120,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     _pageController.dispose();
     _selectIndex.dispose();
     AuthService.instance.authActive.removeListener(_authListener);
+    _nfcSub?.cancel();
     super.dispose();
   }
 
@@ -281,5 +286,20 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         ],
       ),
     );
+  }
+  Future<void> _setupNfcEvents() async {
+    final prefs = await SharedPreferences.getInstance();
+    final allowNfc = prefs.getBool('auth_use_nfc') ?? false;
+    final uids = prefs.getStringList('auth_nfc_uids') ?? const [];
+    if (!allowNfc || uids.isEmpty) return;
+    _nfcSub = FlutterNfcKit.tagStream.listen((tag) async {
+      final id = (tag.id ?? '').trim();
+      if (id.isEmpty) return;
+      final prefs2 = await SharedPreferences.getInstance();
+      final wl = prefs2.getStringList('auth_nfc_uids') ?? const [];
+      if (wl.map((e) => e.toLowerCase()).contains(id.toLowerCase())) {
+        await AuthService.instance.grantAdminSession();
+      }
+    });
   }
 }

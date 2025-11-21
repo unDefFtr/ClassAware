@@ -70,6 +70,7 @@ dependencies:
   sqlite3: ^2.4.4
   sqlite3_flutter_libs: ^0.5.22
   flutter_svg: ^2.0.9
+  flutter_nfc_kit: ^3.3.2
 
 dev_dependencies:
   flutter_test:

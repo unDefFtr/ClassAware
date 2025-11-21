@@ -3,6 +3,8 @@ package com.example.classaware
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.app.PendingIntent
+import android.nfc.NfcAdapter
 import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
@@ -17,6 +19,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
+import im.nfc.flutter_nfc_kit.FlutterNfcKitPlugin
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.classaware/launcher"
@@ -38,11 +41,51 @@ class MainActivity : FlutterActivity() {
                         result.error("ERROR", "Failed to get launchable apps", e.message)
                     }
                 }
+                "getAppIcon" -> {
+                    try {
+                        val packageName = call.argument<String>("packageName")
+                        if (packageName.isNullOrEmpty()) {
+                            result.error("ERROR", "Missing packageName", null)
+                        } else {
+                            Thread {
+                                try {
+                                    val bytes = getApplicationIconBytes(packageName)
+                                    runOnUiThread { result.success(bytes) }
+                                } catch (e: Exception) {
+                                    runOnUiThread { result.error("ERROR", "Failed to get app icon", e.message) }
+                                }
+                            }.start()
+                        }
+                    } catch (e: Exception) {
+                        result.error("ERROR", "Failed to get app icon", e.message)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val adapter: NfcAdapter? = NfcAdapter.getDefaultAdapter(this)
+        val pendingIntent: PendingIntent = PendingIntent.getActivity(
+            this, 0, Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_MUTABLE
+        )
+        adapter?.enableForegroundDispatch(this, pendingIntent, null, null)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        val adapter: NfcAdapter? = NfcAdapter.getDefaultAdapter(this)
+        adapter?.disableForegroundDispatch(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val tag: android.nfc.Tag? = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+        tag?.apply(FlutterNfcKitPlugin::handleTag)
     }
     
     // 使用LauncherApps服务获取应用 - 参考Lawnchair实现
@@ -70,17 +113,11 @@ class MainActivity : FlutterActivity() {
                         
                         try {
                             val appName = activityInfo.label.toString()
-                            // 获取应用图标的Base64编码
-                            val iconBase64 = getAppIconBase64(componentName)
-                            
                             appList.add(mapOf(
                                 "name" to appName,
-                                "packageName" to packageName,
-                                "icon" to iconBase64
+                                "packageName" to packageName
                             ))
-                        } catch (e: Exception) {
-                            // 跳过无法获取信息的应用
-                        }
+                        } catch (_: Exception) {}
                     }
                 }
             } catch (e: Exception) {
@@ -91,19 +128,21 @@ class MainActivity : FlutterActivity() {
         return appList.sortedBy { it["name"] }
     }
     
-    /**
-     * 获取应用图标的Base64编码
-     */
-    private fun getAppIconBase64(componentName: ComponentName): String {
+    private fun getApplicationIconBytes(packageName: String): ByteArray? {
         return try {
-            val packageManager = packageManager
-            val drawable = packageManager.getActivityIcon(componentName)
-            val bitmap = drawableToBitmap(drawable)
+            val pm = packageManager
+            val drawable = pm.getApplicationIcon(packageName)
+            val src = drawableToBitmap(drawable)
+            val density = resources.displayMetrics.density
+            val sizePx = (48 * density).toInt().coerceAtLeast(32)
+            val bmp = if (src.width != sizePx || src.height != sizePx) {
+                Bitmap.createScaledBitmap(src, sizePx, sizePx, true)
+            } else src
             val outputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-            Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
-        } catch (e: Exception) {
-            "" // 返回空字符串表示无图标
+            bmp.compress(Bitmap.CompressFormat.PNG, 80, outputStream)
+            outputStream.toByteArray()
+        } catch (_: Exception) {
+            null
         }
     }
     

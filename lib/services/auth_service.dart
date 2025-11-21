@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:nfc_manager/nfc_manager.dart';
+import 'package:flutter_nfc_kit/flutter_nfc_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
@@ -14,6 +15,7 @@ class AuthService {
   DateTime? _authenticatedUntil;
   Timer? _authTimer;
   final ValueNotifier<bool> authActive = ValueNotifier(false);
+  bool nfcModalActive = false;
 
   Future<bool> _isLockedForIndex(int index) async {
     final prefs = await SharedPreferences.getInstance();
@@ -430,60 +432,97 @@ class AuthService {
     if (allowed.isEmpty) return false;
     final availability = await NfcManager.instance.checkAvailability();
     if (availability != NfcAvailability.enabled) return false;
-    String? uid;
-    try {
-      await NfcManager.instance.startSession(
-        pollingOptions: const {NfcPollingOption.iso14443, NfcPollingOption.iso18092},
-        onDiscovered: (tag) async {
-          final raw = tag.data;
-          List<int>? idBytes;
-          if (raw is Map && raw['id'] is List) {
-            idBytes = (raw['id'] as List).cast<int>();
-          } else if (raw is Map && raw['nfca'] is Map && raw['nfca']['identifier'] is List) {
-            idBytes = (raw['nfca']['identifier'] as List).cast<int>();
-          } else if (raw is Map && raw['mifareultralight'] is Map && raw['mifareultralight']['identifier'] is List) {
-            idBytes = (raw['mifareultralight']['identifier'] as List).cast<int>();
-          } else if (raw is Map && raw['ndef'] is Map && raw['ndef']['identifier'] is List) {
-            idBytes = (raw['ndef']['identifier'] as List).cast<int>();
+    final completer = Completer<bool>();
+    if (!context.mounted) return false;
+    final msg = ValueNotifier<String>('请将卡片贴近设备');
+    final uidVN = ValueNotifier<String>('');
+    final scanningVN = ValueNotifier<bool>(true);
+
+    Future<void> startScan() async {
+      try {
+        try { await FlutterNfcKit.finish(); } catch (_) {}
+        final tag = await FlutterNfcKit.poll(timeout: const Duration(seconds: 10));
+        final uidStr = (tag.id ?? '').trim();
+        try { await FlutterNfcKit.finish(); } catch (_) {}
+        scanningVN.value = false;
+        uidVN.value = uidStr;
+        if (uidStr.isNotEmpty && allowed.map((e) => e.toLowerCase()).contains(uidStr.toLowerCase())) {
+          msg.value = '认证成功';
+          if (context.mounted) {
+            Navigator.of(context, rootNavigator: true).pop();
           }
-          if (idBytes != null) {
-            uid = idBytes.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
-          }
-          await NfcManager.instance.stopSession();
-        },
-      );
-    } catch (_) {}
-    if (uid == null) return false;
-    return allowed.map((e) => e.toLowerCase()).contains(uid!.toLowerCase());
+          if (!completer.isCompleted) completer.complete(true);
+          nfcModalActive = false;
+        } else {
+          msg.value = uidStr.isEmpty ? '未读取到卡片' : '卡片未授权：$uidStr';
+          // 继续监听下一次刷卡，无需点击重试
+          scanningVN.value = true;
+          Future.delayed(const Duration(milliseconds: 200), () { startScan(); });
+        }
+      } catch (_) {
+        try { await FlutterNfcKit.finish(); } catch (_) {}
+        msg.value = '未读取到卡片';
+        // 继续等待下一次刷卡
+        scanningVN.value = true;
+        Future.delayed(const Duration(milliseconds: 200), () { startScan(); });
+      }
+    }
+
+    // 显示对话框并启动首次扫描
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        // 首次进入时启动扫描
+        WidgetsBinding.instance.addPostFrameCallback((_) { startScan(); });
+        return AlertDialog(
+          title: const Text('NFC 身份验证'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.nfc, size: 36, color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(height: 12),
+              ListenableBuilder(
+                listenable: msg,
+                builder: (ctx, _) => Text(msg.value),
+              ),
+              const SizedBox(height: 8),
+              ListenableBuilder(
+                listenable: uidVN,
+                builder: (ctx, _) => uidVN.value.isEmpty
+                    ? const SizedBox.shrink()
+                    : Text('UID: ${uidVN.value}', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                try { await FlutterNfcKit.finish(); } catch (_) {}
+                Navigator.of(ctx).pop();
+                if (!completer.isCompleted) completer.complete(false);
+              },
+              child: const Text('取消'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return completer.future;
   }
 
   Future<String?> readNfcUidOnce() async {
-    final availability = await NfcManager.instance.checkAvailability();
-    if (availability != NfcAvailability.enabled) return null;
-    String? uid;
     try {
-      await NfcManager.instance.startSession(
-        pollingOptions: const {NfcPollingOption.iso14443, NfcPollingOption.iso18092},
-        onDiscovered: (tag) async {
-          final raw = tag.data;
-          List<int>? idBytes;
-          if (raw is Map && raw['id'] is List) {
-            idBytes = (raw['id'] as List).cast<int>();
-          } else if (raw is Map && raw['nfca'] is Map && raw['nfca']['identifier'] is List) {
-            idBytes = (raw['nfca']['identifier'] as List).cast<int>();
-          } else if (raw is Map && raw['mifareultralight'] is Map && raw['mifareultralight']['identifier'] is List) {
-            idBytes = (raw['mifareultralight']['identifier'] as List).cast<int>();
-          } else if (raw is Map && raw['ndef'] is Map && raw['ndef']['identifier'] is List) {
-            idBytes = (raw['ndef']['identifier'] as List).cast<int>();
-          }
-          if (idBytes != null) {
-            uid = idBytes.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
-          }
-          await NfcManager.instance.stopSession();
-        },
-      );
-    } catch (_) {}
-    return uid;
+      try { await FlutterNfcKit.finish(); } catch (_) {}
+      final tag = await FlutterNfcKit.poll(timeout: const Duration(seconds: 10));
+      final uidStr = (tag.id ?? '').trim();
+      try { await FlutterNfcKit.finish(); } catch (_) {}
+      return uidStr.isEmpty ? null : uidStr;
+    } catch (_) {
+      try { await FlutterNfcKit.finish(); } catch (_) {}
+      return null;
+    }
   }
 
   Future<bool> guardForIndex(BuildContext context, int index) async {
@@ -499,6 +538,9 @@ class AuthService {
 
   Future<bool> shouldLockSettings() async {
     return await _isLockedForIndex(3);
+  }
+  Future<void> grantAdminSession() async {
+    await _setAuthenticatedForDuration();
   }
 }
 

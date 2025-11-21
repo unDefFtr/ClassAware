@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../utils/logger.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/city_database_service.dart';
+import 'package:flutter_nfc_kit/flutter_nfc_kit.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../services/auth_service.dart';
@@ -1132,14 +1133,81 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   }
 
   Future<void> _addNfcUid() async {
-    final uid = await AuthService.instance.readNfcUidOnce();
-    if (uid != null && uid.isNotEmpty) {
+    if (!mounted) return;
+    final msg = ValueNotifier<String>('请将卡片贴近设备');
+    final uidVN = ValueNotifier<String>('');
+    final scanningVN = ValueNotifier<bool>(true);
+    Future<void> startScan() async {
+      try {
+        try { await FlutterNfcKit.finish(); } catch (_) {}
+        final tag = await FlutterNfcKit.poll(timeout: const Duration(seconds: 10));
+        final uidStr = (tag.id ?? '').trim();
+        try { await FlutterNfcKit.finish(); } catch (_) {}
+        scanningVN.value = false;
+        uidVN.value = uidStr;
+        if (uidStr.isEmpty) {
+          msg.value = '未读取到卡片';
+          scanningVN.value = true;
+          Future.delayed(const Duration(milliseconds: 200), () { startScan(); });
+        } else {
+          msg.value = '已读取 UID: $uidStr';
+        }
+      } catch (_) {
+        try { await FlutterNfcKit.finish(); } catch (_) {}
+        msg.value = '未读取到卡片';
+        scanningVN.value = true;
+        Future.delayed(const Duration(milliseconds: 200), () { startScan(); });
+      }
+    }
+    final added = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        WidgetsBinding.instance.addPostFrameCallback((_) { startScan(); });
+        return AlertDialog(
+          title: const Text('录入 NFC 卡片'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.nfc, size: 36, color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(height: 12),
+              ListenableBuilder(listenable: msg, builder: (c, _) => Text(msg.value)),
+              const SizedBox(height: 8),
+              ListenableBuilder(
+                listenable: uidVN,
+                builder: (c, _) => uidVN.value.isEmpty
+                    ? const SizedBox.shrink()
+                    : Text('UID: ${uidVN.value}', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                try { await FlutterNfcKit.finish(); } catch (_) {}
+                Navigator.of(ctx).pop(false);
+              },
+              child: const Text('取消'),
+            ),
+            ListenableBuilder(
+              listenable: uidVN,
+              builder: (c, _) => FilledButton(
+                onPressed: uidVN.value.isEmpty ? null : () => Navigator.of(ctx).pop(true),
+                child: const Text('添加'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (added == true && uidVN.value.isNotEmpty) {
+      final uid = uidVN.value;
       setState(() { _authNfcUids = {..._authNfcUids, uid}.toList(); });
       await _saveSetting('auth_nfc_uids', _authNfcUids);
       setState(() { _authEnabled = true; });
       await _saveSetting('auth_enabled', true);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已添加卡片')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已添加卡片 UID: $uid')));
       }
       return;
     }
