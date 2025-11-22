@@ -46,6 +46,8 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   final TextEditingController _teacherCountController = TextEditingController(text: '5');
   bool _fakeEnabled = false;
   double _fakeThreshold = 50.0;
+  bool _devMode = false;
+  int _devStepsLeft = 7;
   bool _gridOverlay = false;
 
   @override
@@ -84,6 +86,8 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       _teacherCount = prefs.getInt('teacher_count') ?? 5;
       _studentCountController.text = _studentCount.toString();
       _teacherCountController.text = _teacherCount.toString();
+      _devMode = prefs.getBool('dev_mode') ?? false;
+      _devStepsLeft = _devMode ? 0 : 7;
       _gridOverlay = prefs.getBool('grid_overlay') ?? false;
     });
   }
@@ -220,17 +224,18 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                     ),
                   ),
                   SizedBox(width: gap),
-                  SizedBox(
-                    width: colW,
-                    height: vh,
-                    child: ListView(
-                      padding: EdgeInsets.symmetric(vertical: 16.w),
-                      physics: const BouncingScrollPhysics(),
-                      children: [
-                        RepaintBoundary(child: _buildSectionCard(title: '其它设置(测试)', icon: Icons.tune, children: _fakeChildren())),
-                      ],
+                  if (_devMode)
+                    SizedBox(
+                      width: colW,
+                      height: vh,
+                      child: ListView(
+                        padding: EdgeInsets.symmetric(vertical: 16.w),
+                        physics: const BouncingScrollPhysics(),
+                        children: [
+                          RepaintBoundary(child: _buildSectionCard(title: '调试', icon: Icons.tune, children: _fakeChildren())),
+                        ],
+                      ),
                     ),
-                  ),
                   ],
                 ),
               ),
@@ -593,6 +598,16 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
           ),
           
           SizedBox(height: 32.h),
+          if (_devMode)
+            RepaintBoundary(
+              child: _buildSectionCard(
+                title: '调试',
+                icon: Icons.tune,
+                children: _fakeChildren(),
+              ),
+            ),
+          if (_devMode)
+            SizedBox(height: 32.h),
         ],
       ),
     );
@@ -773,7 +788,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   List<Widget> _systemChildren() {
     final showSystem = kIsWeb || defaultTargetPlatform == TargetPlatform.android;
     final list = <Widget>[
-      _buildInfoTile('应用版本', '1.0.0'),
+      _buildVersionTile('应用版本', '1.0.0'),
     ];
     if (showSystem) {
       String systemVersion = '';
@@ -789,6 +804,44 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       list.add(_buildInfoTile('系统版本', systemVersion));
     }
     return list;
+  }
+
+  Widget _buildVersionTile(String title, String value) {
+    return RepaintBoundary(
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(title, style: TextStyle(fontSize: 16.sp)),
+        trailing: Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 16.sp, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        onTap: _onVersionTap,
+      ),
+    );
+  }
+
+  Future<void> _onVersionTap() async {
+    if (_devMode) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('您现在处于开发者模式！')));
+      return;
+    }
+    if (_devStepsLeft > 1) {
+      setState(() { _devStepsLeft -= 1; });
+      final left = _devStepsLeft;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('现在只需再进行 $left 步操作，即可进入开发者模式。')),
+      );
+    } else {
+      setState(() { _devStepsLeft = 0; _devMode = true; });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('dev_mode', true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('您现在处于开发者模式！')));
+    }
   }
 
   List<Widget> _fakeChildren() {
