@@ -46,6 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   final TextEditingController _teacherCountController = TextEditingController(text: '5');
   bool _fakeEnabled = false;
   double _fakeThreshold = 50.0;
+  bool _gridOverlay = false;
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复加载设置
@@ -83,6 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       _teacherCount = prefs.getInt('teacher_count') ?? 5;
       _studentCountController.text = _studentCount.toString();
       _teacherCountController.text = _teacherCount.toString();
+      _gridOverlay = prefs.getBool('grid_overlay') ?? false;
     });
   }
 
@@ -796,6 +798,15 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
         subtitle: '用于布局与交互验证',
         value: _fakeEnabled,
         onChanged: (v) { setState(() { _fakeEnabled = v; }); },
+      ),
+      _buildSwitchTile(
+        title: '网格显示',
+        subtitle: '在主页面叠加网格用于测试',
+        value: _gridOverlay,
+        onChanged: (v) {
+          setState(() { _gridOverlay = v; });
+          _saveSetting('grid_overlay', v);
+        },
       ),
       _buildSliderTile(
         title: '测试阈值',

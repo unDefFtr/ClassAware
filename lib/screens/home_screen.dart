@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../services/schedule_service.dart';
+import '../services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,6 +35,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   String _className = '高三(1)班';
   String _headTeacher = '张老师';
   int _profileTick = 0;
+  bool _editMode = false;
+  List<_HomeCard> _cardOrder = [_HomeCard.timeWeather, _HomeCard.classInfo, _HomeCard.schedule];
+  bool _gridOverlay = false;
+  int? _overlayHighlightSlot;
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复初始化定时器
@@ -53,6 +58,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     _setupWeatherTimer();
     _loadCounts();
     _loadProfile();
+    _loadCardOrder();
+    _loadGridOverlay();
   }
 
   @override
@@ -84,78 +91,223 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               final isWide = w >= 1000 || ar >= 1.4;
               final isMedium = w >= 760 || ar >= 1.2;
               if (isWide) {
-                return Row(
+                return Stack(
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: _buildTimeWeatherCard(cardPadding),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: _slotWrapper(0, _buildCardFor(_cardOrder[0], cardPadding)),
+                              ),
+                              SizedBox(height: 7.h),
+                              Expanded(
+                                child: _slotWrapper(1, _buildCardFor(_cardOrder[1], cardPadding)),
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 7.h),
-                          Expanded(
-                            child: _buildClassInfoCard(cardPadding),
-                          ),
-                        ],
+                        ),
+                        SizedBox(width: 7.w),
+                        Expanded(
+                          flex: 4,
+                          child: _slotWrapper(2, _buildCardFor(_cardOrder[2], cardPadding)),
+                        ),
+                      ],
+                    ),
+                    if (_editMode)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: FilledButton.tonal(
+                          onPressed: _exitEditMode,
+                          child: const Text('完成'),
+                        ),
                       ),
-                    ),
-                    SizedBox(width: 7.w),
-                    Expanded(
-                      flex: 4,
-                      child: _buildTodaySchedule(cardPadding),
-                    ),
+                    if (_gridOverlay)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: CustomPaint(
+                            painter: _GridOverlayPainter(
+                              mode: _GridMode.wide,
+                              gapW: 7.w,
+                              gapH: 7.h,
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+                              highlightSlot: _overlayHighlightSlot,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 );
               }
               if (isMedium) {
-                return Column(
+                return Stack(
                   children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildTimeWeatherCard(cardPadding),
+                    Column(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _slotWrapper(0, _buildCardFor(_cardOrder[0], cardPadding)),
+                              ),
+                              SizedBox(width: 7.w),
+                              Expanded(
+                                child: _slotWrapper(1, _buildCardFor(_cardOrder[1], cardPadding)),
+                              ),
+                            ],
                           ),
-                          SizedBox(width: 7.w),
-                          Expanded(
-                            child: _buildClassInfoCard(cardPadding),
-                          ),
-                        ],
+                        ),
+                        SizedBox(height: 7.h),
+                        Expanded(
+                          child: _slotWrapper(2, _buildCardFor(_cardOrder[2], cardPadding)),
+                        ),
+                      ],
+                    ),
+                    if (_editMode)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: FilledButton.tonal(
+                          onPressed: _exitEditMode,
+                          child: const Text('完成'),
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 7.h),
-                    Expanded(
-                      child: _buildTodaySchedule(cardPadding),
-                    ),
+                    if (_gridOverlay)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: CustomPaint(
+                            painter: _GridOverlayPainter(
+                              mode: _GridMode.medium,
+                              gapW: 7.w,
+                              gapH: 7.h,
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+                              highlightSlot: _overlayHighlightSlot,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 );
               }
-              return SingleChildScrollView(
-                child: Column(
+              return Stack(
+                children: [
+                  SingleChildScrollView(
+                    child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
                       height: h * 0.35,
-                      child: _buildTimeWeatherCard(cardPadding),
+                      child: _slotWrapper(0, _buildCardFor(_cardOrder[0], cardPadding)),
                     ),
                     SizedBox(height: 7.h),
                     SizedBox(
                       height: h * 0.25,
-                      child: _buildClassInfoCard(cardPadding),
+                      child: _slotWrapper(1, _buildCardFor(_cardOrder[1], cardPadding)),
                     ),
                     SizedBox(height: 7.h),
                     SizedBox(
                       height: h * 0.6,
-                      child: _buildTodaySchedule(cardPadding),
+                      child: _slotWrapper(2, _buildCardFor(_cardOrder[2], cardPadding)),
                     ),
                   ],
-                ),
+                    ),
+                  ),
+                  if (_gridOverlay)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: _GridOverlayPainter(
+                            mode: _GridMode.portrait,
+                            gapW: 7.w,
+                            gapH: 7.h,
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+                            highlightSlot: _overlayHighlightSlot,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCardFor(_HomeCard id, double cardPadding) {
+    switch (id) {
+      case _HomeCard.timeWeather:
+        return _buildTimeWeatherCard(cardPadding);
+      case _HomeCard.classInfo:
+        return _buildClassInfoCard(cardPadding);
+      case _HomeCard.schedule:
+        return _buildTodaySchedule(cardPadding);
+    }
+  }
+
+  Widget _slotWrapper(int slotIndex, Widget child) {
+    final cardId = _cardOrder[slotIndex];
+    final keyedChild = KeyedSubtree(key: ValueKey(cardId), child: child);
+    if (!_editMode) {
+      return GestureDetector(
+        onLongPress: _enterEditMode,
+        child: keyedChild,
+      );
+    }
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final fbW = constraints.maxWidth.isFinite ? constraints.maxWidth : 200.w;
+        final fbH = constraints.maxHeight.isFinite ? constraints.maxHeight : 120.h;
+        return DragTarget<_HomeCard>(
+          onWillAcceptWithDetails: (details) {
+            if (_gridOverlay) {
+              setState(() { _overlayHighlightSlot = slotIndex; });
+            }
+            return true;
+          },
+          onAcceptWithDetails: (details) {
+            _moveCardToSlot(details.data, slotIndex);
+            if (_gridOverlay) {
+              setState(() { _overlayHighlightSlot = null; });
+            }
+          },
+          onLeave: (_) {
+            if (_gridOverlay) {
+              setState(() { _overlayHighlightSlot = null; });
+            }
+          },
+          builder: (context, candidate, rejected) {
+            return Draggable<_HomeCard>(
+              data: cardId,
+              dragAnchorStrategy: pointerDragAnchorStrategy,
+              feedback: IgnorePointer(
+                ignoring: true,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Opacity(
+                    opacity: 0.85,
+                    child: SizedBox(width: fbW, height: fbH, child: keyedChild),
+                  ),
+                ),
+              ),
+              childWhenDragging: Opacity(
+                opacity: 0.2,
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
+                ),
+              ),
+              child: keyedChild,
+            );
+          },
+        );
+      },
     );
   }
 
@@ -905,6 +1057,148 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     if (_profileTick == 0) {
       _loadProfile();
       _loadCounts();
+      _loadGridOverlay();
     }
+  }
+
+  Future<void> _loadGridOverlay() async {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getBool('grid_overlay') ?? false;
+    if (v != _gridOverlay) {
+      setState(() { _gridOverlay = v; });
+    }
+  }
+
+  Future<void> _loadCardOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList('home_card_order');
+    if (list == null || list.length != 3) return;
+    final mapped = list.map(_homeCardFromKey).whereType<_HomeCard>().toList();
+    if (mapped.length == 3) {
+      setState(() { _cardOrder = mapped; });
+    }
+  }
+
+  Future<void> _saveCardOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('home_card_order', _cardOrder.map(_homeCardKey).toList());
+  }
+
+  Future<void> _enterEditMode() async {
+    if (_editMode) return;
+    final ok = await AuthService.instance.ensureAuthenticated(context, reason: '编辑主页面');
+    if (!mounted) return;
+    if (ok) setState(() { _editMode = true; });
+  }
+
+  void _exitEditMode() {
+    if (!_editMode) return;
+    setState(() { _editMode = false; });
+  }
+
+  void _moveCardToSlot(_HomeCard card, int slotIndex) {
+    final currentIndex = _cardOrder.indexOf(card);
+    if (currentIndex == -1 || currentIndex == slotIndex) return;
+    final next = List<_HomeCard>.from(_cardOrder);
+    next.removeAt(currentIndex);
+    next.insert(slotIndex, card);
+    setState(() { _cardOrder = next; });
+    _saveCardOrder();
+  }
+
+  void _previewMoveToSlot(_HomeCard card, int slotIndex) {}
+
+  String _homeCardKey(_HomeCard c) {
+    switch (c) {
+      case _HomeCard.timeWeather: return 'timeWeather';
+      case _HomeCard.classInfo: return 'classInfo';
+      case _HomeCard.schedule: return 'schedule';
+    }
+  }
+
+  _HomeCard? _homeCardFromKey(String k) {
+    switch (k) {
+      case 'timeWeather': return _HomeCard.timeWeather;
+      case 'classInfo': return _HomeCard.classInfo;
+      case 'schedule': return _HomeCard.schedule;
+      default: return null;
+    }
+  }
+}
+
+enum _HomeCard { timeWeather, classInfo, schedule }
+
+enum _GridMode { wide, medium, portrait }
+
+class _GridOverlayPainter extends CustomPainter {
+  final _GridMode mode;
+  final double gapW;
+  final double gapH;
+  final Color color;
+  final int? highlightSlot;
+  _GridOverlayPainter({required this.mode, required this.gapW, required this.gapH, required this.color, this.highlightSlot});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    final paintHL = Paint()
+      ..color = color.withValues(alpha: 0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+    Rect r(double x, double y, double w, double h) => Rect.fromLTWH(x, y, w, h);
+    switch (mode) {
+      case _GridMode.wide:
+        final totalW = size.width;
+        final totalH = size.height;
+        final leftW = (totalW - gapW) * 3 / 7;
+        final rightW = (totalW - gapW) * 4 / 7;
+        final leftH = (totalH - gapH) / 2;
+        final leftTop = r(0, 0, leftW, leftH);
+        final leftBottom = r(0, leftH + gapH, leftW, leftH);
+        final right = r(leftW + gapW, 0, rightW, totalH);
+        final rects = [leftTop, leftBottom, right];
+        for (var i = 0; i < rects.length; i++) {
+          canvas.drawRect(rects[i], paint);
+          if (highlightSlot == i) canvas.drawRect(rects[i], paintHL);
+        }
+        break;
+      case _GridMode.medium:
+        final totalW = size.width;
+        final totalH = size.height;
+        final topH = (totalH - gapH) / 2;
+        final bottomH = totalH - topH - gapH;
+        final leftW = (totalW - gapW) / 2;
+        final rightW = leftW;
+        final topLeft = r(0, 0, leftW, topH);
+        final topRight = r(leftW + gapW, 0, rightW, topH);
+        final bottom = r(0, topH + gapH, totalW, bottomH);
+        final rects = [topLeft, topRight, bottom];
+        for (var i = 0; i < rects.length; i++) {
+          canvas.drawRect(rects[i], paint);
+          if (highlightSlot == i) canvas.drawRect(rects[i], paintHL);
+        }
+        break;
+      case _GridMode.portrait:
+        final totalW = size.width;
+        final totalH = size.height;
+        final aH = totalH * 0.35;
+        final bH = totalH * 0.25;
+        final cH = totalH * 0.6;
+        final top = r(0, 0, totalW, aH);
+        final mid = r(0, aH + gapH, totalW, bH);
+        final bot = r(0, aH + gapH + bH + gapH, totalW, cH);
+        final rects = [top, mid, bot];
+        for (var i = 0; i < rects.length; i++) {
+          canvas.drawRect(rects[i], paint);
+          if (highlightSlot == i) canvas.drawRect(rects[i], paintHL);
+        }
+        break;
+    }
+  }
+  @override
+  bool shouldRepaint(covariant _GridOverlayPainter oldDelegate) {
+    return oldDelegate.mode != mode || oldDelegate.gapW != gapW || oldDelegate.gapH != gapH || oldDelegate.color != color;
   }
 }
