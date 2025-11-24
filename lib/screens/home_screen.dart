@@ -283,7 +283,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           builder: (context, candidate, rejected) {
             return Draggable<_HomeCard>(
               data: cardId,
-              dragAnchorStrategy: pointerDragAnchorStrategy,
+              dragAnchorStrategy: childDragAnchorStrategy,
               feedback: IgnorePointer(
                 ignoring: true,
                 child: Material(

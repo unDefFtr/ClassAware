@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import '../utils/logger.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WeatherService {
   static final WeatherService instance = WeatherService._();
@@ -19,26 +20,51 @@ class WeatherService {
       'isGlobal': 'false',
       'locale': 'zh_cn',
     });
-    final client = HttpClient();
-    try {
-      Log.d('请求天气数据 key=$key days=$days', tag: 'Weather');
-      final req = await client.getUrl(uri);
-      req.headers.set('User-Agent', 'ClassAware');
-      final res = await req.close().timeout(const Duration(seconds: 10));
-      if (res.statusCode != 200) {
-        Log.w('天气接口返回非200: ${res.statusCode}', tag: 'Weather');
-        return null;
+    final prefs = await SharedPreferences.getInstance();
+    final cacheKey = 'weather_cache:$key:$days';
+    WeatherData? parsed;
+    String? rawBody;
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      final client = HttpClient();
+      try {
+        Log.d('请求天气数据 attempt=$attempt key=$key days=$days', tag: 'Weather');
+        final req = await client.getUrl(uri).timeout(const Duration(seconds: 5));
+        req.headers.set('User-Agent', 'XiaomiWeather/12.5 (ClassAware)');
+        req.headers.set('Connection', 'close');
+        final res = await req.close().timeout(const Duration(seconds: 10));
+        if (res.statusCode != 200) {
+          Log.w('天气接口返回非200: ${res.statusCode}', tag: 'Weather');
+          throw HttpException('Bad status: ${res.statusCode}');
+        }
+        rawBody = await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 10));
+        Log.t('天气响应长度=${rawBody.length}', tag: 'Weather');
+        final jsonData = json.decode(rawBody) as Map<String, dynamic>;
+        parsed = WeatherData.fromJson(jsonData);
+        break;
+      } catch (e, st) {
+        Log.w('天气请求失败 attempt=$attempt', tag: 'Weather', error: e, stack: st);
+        final delayMs = attempt == 1 ? 400 : attempt == 2 ? 800 : 1600;
+        await Future.delayed(Duration(milliseconds: delayMs));
+      } finally {
+        client.close(force: true);
       }
-      final body = await res.transform(utf8.decoder).join();
-      Log.t('天气响应长度=${body.length}', tag: 'Weather');
-      final jsonData = json.decode(body) as Map<String, dynamic>;
-      return WeatherData.fromJson(jsonData);
-    } catch (e, st) {
-      Log.e('天气请求失败', tag: 'Weather', error: e, stack: st);
-      return null;
-    } finally {
-      client.close(force: true);
     }
+    if (parsed != null && rawBody != null) {
+      await prefs.setString(cacheKey, rawBody);
+      await prefs.setInt('$cacheKey:ts', DateTime.now().millisecondsSinceEpoch);
+      return parsed;
+    }
+    final cached = prefs.getString(cacheKey);
+    if (cached != null && cached.isNotEmpty) {
+      try {
+        Log.d('使用缓存天气数据 key=$key days=$days', tag: 'Weather');
+        final jsonData = json.decode(cached) as Map<String, dynamic>;
+        return WeatherData.fromJson(jsonData);
+      } catch (e) {
+        Log.w('解析缓存天气数据失败', tag: 'Weather', error: e);
+      }
+    }
+    return null;
   }
 }
 
