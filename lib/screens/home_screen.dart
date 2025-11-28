@@ -39,6 +39,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   List<_HomeCard> _cardOrder = [_HomeCard.timeWeather, _HomeCard.classInfo, _HomeCard.schedule];
   bool _gridOverlay = false;
   int? _overlayHighlightSlot;
+  final GlobalKey _editDoneKey = GlobalKey();
+  double _editOverlayHeight = 0.0;
+  int? _recentDropSlot;
+  Offset? _recentDropLocalOffset;
+  _HomeCard? _recentOtherCard;
+  int? _recentOtherSlot;
+  Offset? _recentOtherStartGlobal;
+  final List<GlobalKey> _slotKeys = [GlobalKey(), GlobalKey(), GlobalKey()];
 
   @override
   bool get wantKeepAlive => true; // 保持页面状态，避免重复初始化定时器
@@ -90,21 +98,33 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               final ar = w / (h == 0 ? 1 : h);
               final isWide = w >= 1000 || ar >= 1.4;
               final isMedium = w >= 760 || ar >= 1.2;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                final ctx = _editDoneKey.currentContext;
+                final box = ctx?.findRenderObject() as RenderBox?;
+                final hBtn = box?.size.height ?? 0.0;
+                if (hBtn != _editOverlayHeight) {
+                  setState(() { _editOverlayHeight = hBtn; });
+                }
+              });
               if (isWide) {
                 return Stack(
                   children: [
-                    Row(
+                    AnimatedScale(
+                      scale: _computeEditScale(h),
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      child: Row(
                       children: [
                         Expanded(
                           flex: 3,
                           child: Column(
                             children: [
                               Expanded(
-                                child: _slotWrapper(0, _buildCardFor(_cardOrder[0], cardPadding)),
+                                child: _slotWrapper(0, _computeEditScale(h), _buildCardFor(_cardOrder[0], cardPadding)),
                               ),
                               SizedBox(height: 7.h),
                               Expanded(
-                                child: _slotWrapper(1, _buildCardFor(_cardOrder[1], cardPadding)),
+                                child: _slotWrapper(1, _computeEditScale(h), _buildCardFor(_cardOrder[1], cardPadding)),
                               ),
                             ],
                           ),
@@ -112,15 +132,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                         SizedBox(width: 7.w),
                         Expanded(
                           flex: 4,
-                          child: _slotWrapper(2, _buildCardFor(_cardOrder[2], cardPadding)),
+                          child: _slotWrapper(2, _computeEditScale(h), _buildCardFor(_cardOrder[2], cardPadding)),
                         ),
                       ],
+                      ),
                     ),
                     if (_editMode)
                       Positioned(
                         right: 0,
                         top: 0,
                         child: FilledButton.tonal(
+                          key: _editDoneKey,
                           onPressed: _exitEditMode,
                           child: const Text('完成'),
                         ),
@@ -145,32 +167,38 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               if (isMedium) {
                 return Stack(
                   children: [
-                    Column(
+                    AnimatedScale(
+                      scale: _computeEditScale(h),
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      child: Column(
                       children: [
                         Expanded(
                           child: Row(
                             children: [
                               Expanded(
-                                child: _slotWrapper(0, _buildCardFor(_cardOrder[0], cardPadding)),
+                                child: _slotWrapper(0, _computeEditScale(h), _buildCardFor(_cardOrder[0], cardPadding)),
                               ),
                               SizedBox(width: 7.w),
                               Expanded(
-                                child: _slotWrapper(1, _buildCardFor(_cardOrder[1], cardPadding)),
+                                child: _slotWrapper(1, _computeEditScale(h), _buildCardFor(_cardOrder[1], cardPadding)),
                               ),
                             ],
                           ),
                         ),
                         SizedBox(height: 7.h),
                         Expanded(
-                          child: _slotWrapper(2, _buildCardFor(_cardOrder[2], cardPadding)),
+                          child: _slotWrapper(2, _computeEditScale(h), _buildCardFor(_cardOrder[2], cardPadding)),
                         ),
                       ],
+                      ),
                     ),
                     if (_editMode)
                       Positioned(
                         right: 0,
                         top: 0,
                         child: FilledButton.tonal(
+                          key: _editDoneKey,
                           onPressed: _exitEditMode,
                           child: const Text('完成'),
                         ),
@@ -194,25 +222,30 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               }
               return Stack(
                 children: [
-                  SingleChildScrollView(
-                    child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(
-                      height: h * 0.35,
-                      child: _slotWrapper(0, _buildCardFor(_cardOrder[0], cardPadding)),
-                    ),
-                    SizedBox(height: 7.h),
-                    SizedBox(
-                      height: h * 0.25,
-                      child: _slotWrapper(1, _buildCardFor(_cardOrder[1], cardPadding)),
-                    ),
-                    SizedBox(height: 7.h),
-                    SizedBox(
-                      height: h * 0.6,
-                      child: _slotWrapper(2, _buildCardFor(_cardOrder[2], cardPadding)),
-                    ),
-                  ],
+                  AnimatedScale(
+                    scale: _computeEditScale(h),
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    child: SingleChildScrollView(
+                      child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: h * 0.35,
+                          child: _slotWrapper(0, _computeEditScale(h), _buildCardFor(_cardOrder[0], cardPadding)),
+                        ),
+                        SizedBox(height: 7.h),
+                        SizedBox(
+                          height: h * 0.25,
+                          child: _slotWrapper(1, _computeEditScale(h), _buildCardFor(_cardOrder[1], cardPadding)),
+                        ),
+                        SizedBox(height: 7.h),
+                        SizedBox(
+                          height: h * 0.6,
+                          child: _slotWrapper(2, _computeEditScale(h), _buildCardFor(_cardOrder[2], cardPadding)),
+                        ),
+                      ],
+                      ),
                     ),
                   ),
                   if (_gridOverlay)
@@ -238,6 +271,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
   }
 
+  double _computeEditScale(double viewHeight) {
+    if (!_editMode) return 1.0;
+    final margin = 12.h;
+    final neededTop = (_editOverlayHeight > 0 ? _editOverlayHeight : 48.0) + margin;
+    final s = 1.0 - 2.0 * (neededTop / (viewHeight == 0 ? 1.0 : viewHeight));
+    return s.clamp(0.85, 1.0);
+  }
+
   Widget _buildCardFor(_HomeCard id, double cardPadding) {
     switch (id) {
       case _HomeCard.timeWeather:
@@ -249,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     }
   }
 
-  Widget _slotWrapper(int slotIndex, Widget child) {
+  Widget _slotWrapper(int slotIndex, double currentScale, Widget child) {
     final cardId = _cardOrder[slotIndex];
     final keyedChild = KeyedSubtree(key: ValueKey(cardId), child: child);
     if (!_editMode) {
@@ -262,6 +303,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       builder: (ctx, constraints) {
         final fbW = constraints.maxWidth.isFinite ? constraints.maxWidth : 200.w;
         final fbH = constraints.maxHeight.isFinite ? constraints.maxHeight : 120.h;
+        final feedbackScale = (currentScale * 1.06).clamp(currentScale, 1.0);
         return DragTarget<_HomeCard>(
           onWillAcceptWithDetails: (details) {
             if (_gridOverlay) {
@@ -270,6 +312,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             return true;
           },
           onAcceptWithDetails: (details) {
+            final box = context.findRenderObject() as RenderBox?;
+            final localPoint = box?.globalToLocal(details.offset) ?? Offset.zero;
+            final startLocal = localPoint - Offset(fbW / 2, fbH / 2);
+            setState(() { _recentDropLocalOffset = startLocal; });
+            final srcIndex = _cardOrder.indexOf(details.data);
+            final otherCard = _cardOrder[slotIndex];
+            final slotTopLeft = box?.localToGlobal(Offset.zero) ?? Offset.zero;
+            final toCenterGlobal = slotTopLeft + Offset(fbW / 2, fbH / 2);
+            _recentOtherCard = otherCard;
+            _recentOtherSlot = srcIndex;
+            _recentOtherStartGlobal = toCenterGlobal;
             _moveCardToSlot(details.data, slotIndex);
             if (_gridOverlay) {
               setState(() { _overlayHighlightSlot = null; });
@@ -281,30 +334,93 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             }
           },
           builder: (context, candidate, rejected) {
-            return Draggable<_HomeCard>(
-              data: cardId,
-              dragAnchorStrategy: childDragAnchorStrategy,
-              feedback: IgnorePointer(
-                ignoring: true,
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: Opacity(
-                    opacity: 0.85,
-                    child: SizedBox(width: fbW, height: fbH, child: keyedChild),
+            final snappedChild = (_recentDropSlot == slotIndex)
+                ? TweenAnimationBuilder<Offset>(
+                    tween: Tween<Offset>(
+                      begin: _recentDropLocalOffset ?? Offset.zero,
+                      end: Offset.zero,
+                    ),
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: feedbackScale, end: currentScale),
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      child: SizedBox(width: fbW, height: fbH, child: keyedChild),
+                      builder: (ctx, s, ch) => Transform.scale(
+                        scale: (currentScale <= 0 ? 1.0 : s / currentScale),
+                        child: ch!,
+                      ),
+                    ),
+                    builder: (ctx, o, ch) => Transform.translate(offset: o, child: ch!),
+                  )
+                : keyedChild;
+            return KeyedSubtree(
+              key: _slotKeys[slotIndex],
+              child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedOpacity(
+                    opacity: candidate.isNotEmpty ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Theme.of(context).colorScheme.primary, width: 3),
+                          borderRadius: BorderRadius.circular(16.r),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              childWhenDragging: Opacity(
-                opacity: 0.2,
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
-                    borderRadius: BorderRadius.circular(16.r),
+                Draggable<_HomeCard>(
+                  data: cardId,
+                  dragAnchorStrategy: childDragAnchorStrategy,
+                  feedback: IgnorePointer(
+                    ignoring: true,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: currentScale, end: feedbackScale),
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      child: SizedBox(width: fbW, height: fbH, child: keyedChild),
+                      builder: (ctx, s, ch) => Transform.scale(
+                        scale: s,
+                        child: Opacity(opacity: 0.9, child: ch!),
+                      ),
+                    ),
                   ),
+                  childWhenDragging: SizedBox(
+                    width: fbW,
+                    height: fbH,
+                    child: Opacity(
+                      opacity: 0.2,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
+                          borderRadius: BorderRadius.circular(16.r),
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: (_recentOtherSlot == slotIndex && _recentOtherCard == cardId && _recentOtherStartGlobal != null)
+                      ? Builder(builder: (ctx) {
+                          final b = ctx.findRenderObject() as RenderBox?;
+                          final lp = b?.globalToLocal(_recentOtherStartGlobal!) ?? Offset.zero;
+                          final st = lp - Offset(fbW / 2, fbH / 2);
+                          return TweenAnimationBuilder<Offset>(
+                            tween: Tween<Offset>(begin: st, end: Offset.zero),
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                            child: snappedChild,
+                            builder: (ctx, o, ch) => Transform.translate(offset: o, child: ch!),
+                          );
+                        })
+                      : snappedChild,
                 ),
-              ),
-              child: keyedChild,
-            );
+              ],
+            ),
+          );
           },
         );
       },
@@ -1100,10 +1216,23 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final currentIndex = _cardOrder.indexOf(card);
     if (currentIndex == -1 || currentIndex == slotIndex) return;
     final next = List<_HomeCard>.from(_cardOrder);
-    next.removeAt(currentIndex);
-    next.insert(slotIndex, card);
-    setState(() { _cardOrder = next; });
+    final temp = next[slotIndex];
+    next[slotIndex] = card;
+    next[currentIndex] = temp;
+    setState(() { _cardOrder = next; _recentDropSlot = slotIndex; });
     _saveCardOrder();
+    Future.delayed(const Duration(milliseconds: 260), () {
+      if (!mounted) return;
+      if (_recentDropSlot == slotIndex) {
+        setState(() {
+          _recentDropSlot = null;
+          _recentDropLocalOffset = null;
+          _recentOtherCard = null;
+          _recentOtherSlot = null;
+          _recentOtherStartGlobal = null;
+        });
+      }
+    });
   }
 
   void _previewMoveToSlot(_HomeCard card, int slotIndex) {}
