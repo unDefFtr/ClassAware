@@ -150,13 +150,18 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     if (_gridOverlay)
                       Positioned.fill(
                         child: IgnorePointer(
-                          child: CustomPaint(
-                            painter: _GridOverlayPainter(
-                              mode: _GridMode.wide,
-                              gapW: 7.w,
-                              gapH: 7.h,
-                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
-                              highlightSlot: _overlayHighlightSlot,
+                          child: AnimatedScale(
+                            scale: _computeEditScale(h),
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                            child: CustomPaint(
+                              painter: _GridOverlayPainter(
+                                mode: _GridMode.wide,
+                                gapW: 7.w,
+                                gapH: 7.h,
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+                                highlightSlot: _overlayHighlightSlot,
+                              ),
                             ),
                           ),
                         ),
@@ -206,13 +211,18 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     if (_gridOverlay)
                       Positioned.fill(
                         child: IgnorePointer(
-                          child: CustomPaint(
-                            painter: _GridOverlayPainter(
-                              mode: _GridMode.medium,
-                              gapW: 7.w,
-                              gapH: 7.h,
-                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
-                              highlightSlot: _overlayHighlightSlot,
+                          child: AnimatedScale(
+                            scale: _computeEditScale(h),
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                            child: CustomPaint(
+                              painter: _GridOverlayPainter(
+                                mode: _GridMode.medium,
+                                gapW: 7.w,
+                                gapH: 7.h,
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+                                highlightSlot: _overlayHighlightSlot,
+                              ),
                             ),
                           ),
                         ),
@@ -224,8 +234,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 children: [
                   AnimatedScale(
                     scale: _computeEditScale(h),
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeOutCubic,
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.linearToEaseOut,
                     child: SingleChildScrollView(
                       child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -251,13 +261,18 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   if (_gridOverlay)
                     Positioned.fill(
                       child: IgnorePointer(
-                        child: CustomPaint(
-                          painter: _GridOverlayPainter(
-                            mode: _GridMode.portrait,
-                            gapW: 7.w,
-                            gapH: 7.h,
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
-                            highlightSlot: _overlayHighlightSlot,
+                        child: AnimatedScale(
+                          scale: _computeEditScale(h),
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          child: CustomPaint(
+                            painter: _GridOverlayPainter(
+                              mode: _GridMode.portrait,
+                              gapW: 7.w,
+                              gapH: 7.h,
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+                              highlightSlot: _overlayHighlightSlot,
+                            ),
                           ),
                         ),
                       ),
@@ -303,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       builder: (ctx, constraints) {
         final fbW = constraints.maxWidth.isFinite ? constraints.maxWidth : 200.w;
         final fbH = constraints.maxHeight.isFinite ? constraints.maxHeight : 120.h;
-        final feedbackScale = (currentScale * 1.06).clamp(currentScale, 1.0);
+        final feedbackScale = currentScale;
         return DragTarget<_HomeCard>(
           onWillAcceptWithDetails: (details) {
             if (_gridOverlay) {
@@ -342,16 +357,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     ),
                     duration: const Duration(milliseconds: 260),
                     curve: Curves.easeOutCubic,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: feedbackScale, end: currentScale),
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      child: SizedBox(width: fbW, height: fbH, child: keyedChild),
-                      builder: (ctx, s, ch) => Transform.scale(
-                        scale: (currentScale <= 0 ? 1.0 : s / currentScale),
-                        child: ch!,
-                      ),
-                    ),
+                    child: SizedBox(width: fbW, height: fbH, child: keyedChild),
                     builder: (ctx, o, ch) => Transform.translate(offset: o, child: ch!),
                   )
                 : keyedChild;
@@ -379,14 +385,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   dragAnchorStrategy: childDragAnchorStrategy,
                   feedback: IgnorePointer(
                     ignoring: true,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: currentScale, end: feedbackScale),
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      child: SizedBox(width: fbW, height: fbH, child: keyedChild),
-                      builder: (ctx, s, ch) => Transform.scale(
-                        scale: s,
-                        child: Opacity(opacity: 0.9, child: ch!),
+                    child: Transform.scale(
+                      scale: feedbackScale,
+                      child: Opacity(
+                        opacity: 0.9,
+                        child: SizedBox(width: fbW, height: fbH, child: keyedChild),
                       ),
                     ),
                   ),
@@ -403,20 +406,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       ),
                     ),
                   ),
-                  child: (_recentOtherSlot == slotIndex && _recentOtherCard == cardId && _recentOtherStartGlobal != null)
-                      ? Builder(builder: (ctx) {
-                          final b = ctx.findRenderObject() as RenderBox?;
-                          final lp = b?.globalToLocal(_recentOtherStartGlobal!) ?? Offset.zero;
-                          final st = lp - Offset(fbW / 2, fbH / 2);
-                          return TweenAnimationBuilder<Offset>(
-                            tween: Tween<Offset>(begin: st, end: Offset.zero),
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                            child: snappedChild,
-                            builder: (ctx, o, ch) => Transform.translate(offset: o, child: ch!),
-                          );
-                        })
-                      : snappedChild,
+                  child: snappedChild,
                 ),
               ],
             ),
